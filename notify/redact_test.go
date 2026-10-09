@@ -12,23 +12,24 @@ import (
 	"testing"
 )
 
-// 本文件是不变量测试：**任何**从渠道实现里冒出来的错误文本都不得携带凭据。
+// This file verifies the invariant that **no** error text from channel implementations contains credentials.
 //
-// 为什么单独拉一个文件：最初的渠道用例只覆盖了成功路径与平台业务错误，
-// 完全没看传输层失败。而恰恰是传输层错误（连接被拒/DNS 失败/超时）最危险——
-// http.Client.Do 返回的 *url.Error 会把**完整 URL** 打进错误文本，而本功能
-// 这几家的凭据就在 URL 里。凭据顺着这条串流到了四个出口：
+// This is separate because the original channel tests covered only success and
+// platform application errors, not transport failures. Transport errors (connection
+// refused/DNS failure/timeout) are particularly risky: http.Client.Do returns
+// *url.Error, which includes the **full URL**, and these providers embed credentials
+// in it. Credentials could leak through four paths:
 //
-//	notification_deliveries.last_error  → 明文落库
-//	GET /api/notify/deliveries 响应     → 绕过渠道配置的掩码，回显给浏览器
-//	服务端日志                          → 常被外发留存
-//	测试发送接口的 502 响应             → 直接弹在前端
+//	notification_deliveries.last_error -> stored in plaintext
+//	GET /api/notify/deliveries response -> returned to browser, bypassing channel-config masking
+//	server logs                         -> often forwarded and retained
+//	test-delivery endpoint's 502 response -> shown directly in the frontend
 //
-// 所以这里不只测一个函数，而是逐个渠道真发一次必然失败的请求，断言错误文本
-// 里找不到那个凭据。
+// Therefore, rather than testing only one function, send a guaranteed-to-fail request
+// through each channel and assert that its credential is absent from the error text.
 
-// credentialCases 覆盖所有「凭据在 URL 里」的渠道形态：
-// 钉钉/企微在 query，飞书在路径末段，Telegram 在路径中段。
+// credentialCases covers all channel forms with credentials in the URL:
+// DingTalk/WeCom in the query, Feishu in the final path segment, Telegram in the middle.
 var credentialCases = []struct {
 	name   string
 	ch     Channel
@@ -36,76 +37,77 @@ var credentialCases = []struct {
 	secret string
 }{
 	{
-		name:   "钉钉 access_token 在 query",
+		name:   "DingTalk access_token in query",
 		ch:     dingTalkChannel{},
 		cfg:    map[string]any{"webhook": "http://127.0.0.1:1/robot/send?access_token=" + leakProbeToken},
 		secret: leakProbeToken,
 	},
 	{
-		name:   "企业微信 key 在 query",
+		name:   "WeCom key in query",
 		ch:     weComChannel{},
 		cfg:    map[string]any{"webhook": "http://127.0.0.1:1/cgi-bin/webhook/send?key=" + leakProbeToken},
 		secret: leakProbeToken,
 	},
 	{
-		name:   "飞书 hook id 在路径末段",
+		name:   "Feishu hook ID in final path segment",
 		ch:     feishuChannel{},
 		cfg:    map[string]any{"webhook": "http://127.0.0.1:1/open-apis/bot/v2/hook/" + leakProbeToken},
 		secret: leakProbeToken,
 	},
 	{
-		name:   "Telegram bot token 在路径中段",
+		name:   "Telegram bot token in middle path segment",
 		ch:     telegramChannel{},
 		cfg:    map[string]any{"bot_token": leakProbeToken, "chat_id": "1", "base_url": "http://127.0.0.1:1"},
 		secret: leakProbeToken,
 	},
 	{
-		name:   "钉钉加签密钥",
+		name:   "DingTalk signing secret",
 		ch:     dingTalkChannel{},
 		cfg:    map[string]any{"webhook": "http://127.0.0.1:1/robot/send", "secret": leakProbeToken},
 		secret: leakProbeToken,
 	},
 }
 
-// leakProbeToken 是一个绝不可能是真实凭据的哨兵值，用于在错误文本里搜它。
+// leakProbeToken is a sentinel value that cannot be a real credential, used to search error text.
 const leakProbeToken = "LEAKPROBE0123456789abcdef"
 
-// TestChannelErrorsNeverLeakCredentials 是核心不变量。
+// TestChannelErrorsNeverLeakCredentials checks the core invariant.
 func TestChannelErrorsNeverLeakCredentials(t *testing.T) {
 	for _, tc := range credentialCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 必然失败的对端：127.0.0.1:1 无人监听，走的是连接被拒这条路径。
+			// Guaranteed failure: nothing listens on 127.0.0.1:1, so the connection is refused.
 			_, err := tc.ch.Send(context.Background(), tc.cfg, Message{
-				Items: []Item{{FindingID: 1, Severity: "high", Name: "泄露探针"}},
+				Items: []Item{{FindingID: 1, Severity: "high", Name: "credential leak probe"}},
 			})
 			if err == nil {
-				t.Fatal("对不可达地址应报错")
+				t.Fatal("unreachable address should return an error")
 			}
 			assertNoSecret(t, err.Error(), tc.secret)
 		})
 	}
 }
 
-// TestChannelErrorsNeverLeakCredentialsInPermanentPath 覆盖永久失败分支：
-// URL 校验失败、平台业务错误等也会把错误文本外传，同样不能带凭据。
+// TestChannelErrorsNeverLeakCredentialsInPermanentPath covers permanent-failure
+// paths: URL validation and platform application errors may also be returned externally
+// and must not contain credentials.
 func TestChannelErrorsNeverLeakCredentialsInPermanentPath(t *testing.T) {
 	cases := []struct {
 		name string
 		ch   Channel
 		cfg  map[string]any
 	}{
-		// 地址里带凭据但格式非法 → 触发 validateHTTPURL / url.Parse 分支。
-		{"钉钉地址非法", dingTalkChannel{}, map[string]any{"webhook": "file:///" + leakProbeToken}},
-		{"企微地址非法", weComChannel{}, map[string]any{"webhook": "gopher://" + leakProbeToken}},
-		{"飞书地址非法", feishuChannel{}, map[string]any{"webhook": "ftp://" + leakProbeToken + "/hook"}},
-		{"Telegram API 地址非法", telegramChannel{}, map[string]any{"bot_token": "tok", "chat_id": "1", "base_url": "file://" + leakProbeToken}},
-		{"通用 Webhook 地址非法", webhookChannel{}, map[string]any{"url": "javascript:" + leakProbeToken}},
+		// Invalid URL containing a credential, exercising validateHTTPURL / url.Parse.
+		{"invalid DingTalk URL", dingTalkChannel{}, map[string]any{"webhook": "file:///" + leakProbeToken}},
+		{"invalid WeCom URL", weComChannel{}, map[string]any{"webhook": "gopher://" + leakProbeToken}},
+		{"invalid Feishu URL", feishuChannel{}, map[string]any{"webhook": "ftp://" + leakProbeToken + "/hook"}},
+		{"invalid Telegram API URL", telegramChannel{}, map[string]any{"bot_token": "tok", "chat_id": "1", "base_url": "file://" + leakProbeToken}},
+		{"invalid generic Webhook URL", webhookChannel{}, map[string]any{"url": "javascript:" + leakProbeToken}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := tc.ch.Send(context.Background(), tc.cfg, Message{Items: []Item{{Severity: "high"}}})
 			if err == nil {
-				t.Fatal("非法配置应报错")
+				t.Fatal("invalid config should return an error")
 			}
 			assertNoSecret(t, err.Error(), leakProbeToken)
 		})
@@ -115,7 +117,7 @@ func TestChannelErrorsNeverLeakCredentialsInPermanentPath(t *testing.T) {
 func assertNoSecret(t *testing.T, text, secret string) {
 	t.Helper()
 	if strings.Contains(text, secret) {
-		t.Fatalf("错误文本泄露了凭据 %q:\n    %s", secret, text)
+		t.Fatalf("error text leaked credential %q:\n    %s", secret, text)
 	}
 }
 
@@ -130,27 +132,27 @@ func TestRedactRequestTargetKeepsOnlySchemeAndHost(t *testing.T) {
 	for in, want := range cases {
 		got := redactRequestTarget(in)
 		if got != want {
-			t.Errorf("redactRequestTarget(%q) = %q，期望 %q", in, got, want)
+			t.Errorf("redactRequestTarget(%q) = %q, expected %q", in, got, want)
 		}
-		// 脱敏结果本身不得再含有原地址的任何路径/查询片段。
+		// The redacted result must not contain any path or query fragment from the original address.
 		if parts := strings.SplitN(in, "://", 2); len(parts) == 2 {
 			if hostAndRest := strings.SplitN(parts[1], "/", 2); len(hostAndRest) == 2 && hostAndRest[1] != "" {
 				if strings.Contains(got, hostAndRest[1]) {
-					t.Errorf("脱敏后仍含路径/查询片段 %q: %q", hostAndRest[1], got)
+					t.Errorf("redacted result still contains path/query fragment %q: %q", hostAndRest[1], got)
 				}
 			}
 		}
 	}
-	// 不可解析的输入绝不回显原串。
+	// Never echo an unparseable input.
 	for _, bad := range []string{"", "://", "not a url", "http://"} {
 		if got := redactRequestTarget(bad); strings.Contains(got, bad) && bad != "" {
-			t.Errorf("不可解析输入 %q 被回显为 %q", bad, got)
+			t.Errorf("unparseable input %q was echoed as %q", bad, got)
 		}
 	}
 }
 
-// TestRedactTransportErrorStripsURL 直接盯住 *url.Error 这个具体类型：
-// 它是 http.Client.Do 的返回类型，也是泄露的第一现场。
+// TestRedactTransportErrorStripsURL specifically checks *url.Error, the error type
+// returned by http.Client.Do and the first point at which credentials could leak.
 func TestRedactTransportErrorStripsURL(t *testing.T) {
 	inner := errors.New("dial tcp 127.0.0.1:1: connect: connection refused")
 	uerr := &url.Error{
@@ -161,35 +163,35 @@ func TestRedactTransportErrorStripsURL(t *testing.T) {
 	got := redactTransportError(uerr)
 	assertNoSecret(t, got, leakProbeToken)
 	if !strings.Contains(got, "api.telegram.org") {
-		t.Errorf("应保留 host 以便排查，得到 %q", got)
+		t.Errorf("host should remain for troubleshooting, got %q", got)
 	}
 	if !strings.Contains(got, "connection refused") {
-		t.Errorf("应保留底层原因以便排查，得到 %q", got)
+		t.Errorf("underlying cause should remain for troubleshooting, got %q", got)
 	}
-	// Op 也要保留（POST 还是 GET 对排查有意义）。
+	// Keep Op too; whether the request was POST or GET is useful for troubleshooting.
 	if !strings.Contains(got, "Post") {
-		t.Errorf("应保留操作名，得到 %q", got)
+		t.Errorf("operation name should remain, got %q", got)
 	}
 }
 
-// TestRedactURLsInTextHandlesFallback 兜底路径：非 *url.Error 的自定义错误
-// （如重定向策略返回的错误）里的地址同样要被摘掉。
+// TestRedactURLsInTextHandlesFallback covers the fallback for addresses in custom
+// errors that are not *url.Error (e.g. errors returned by redirect policy).
 func TestRedactURLsInTextHandlesFallback(t *testing.T) {
-	in := fmt.Sprintf("拒绝跨主机重定向（a.example → http://b.example/bot%s/send）", leakProbeToken)
+	in := fmt.Sprintf("cross-host redirect rejected (a.example -> http://b.example/bot%s/send)", leakProbeToken)
 	got := redactURLsInText(in)
 	assertNoSecret(t, got, leakProbeToken)
 	if !strings.Contains(got, "http://b.example/…") {
-		t.Errorf("应把地址替换为脱敏形态，得到 %q", got)
+		t.Errorf("address should be replaced with a redacted form, got %q", got)
 	}
-	// 不含地址的文本原样保留。
+	// Text without an address remains unchanged.
 	if plain := "dial tcp: connection refused"; redactURLsInText(plain) != plain {
-		t.Error("不含地址的文本不应被改动")
+		t.Error("text without an address should not change")
 	}
 }
 
-// TestCrossHostRedirectRefused 覆盖「凭据在 URL 里 + 跟随跨主机跳转 = 交出凭据」。
-// httptest 的两个服务监听在 127.0.0.1 的不同端口，端口不同即 Host 不同，
-// 正好构成跨主机跳转。
+// TestCrossHostRedirectRefused verifies that credentials in a URL are exposed by
+// following cross-host redirects. The httptest servers listen on different ports on
+// 127.0.0.1, so their hosts differ and form a cross-host redirect.
 func TestCrossHostRedirectRefused(t *testing.T) {
 	var hit bool
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -207,20 +209,20 @@ func TestCrossHostRedirectRefused(t *testing.T) {
 		map[string]any{"webhook": redirector.URL + "/robot/send?access_token=" + leakProbeToken},
 		Message{Items: []Item{{Severity: "high"}}})
 	if err == nil {
-		t.Fatal("跨主机重定向应被拒绝")
+		t.Fatal("cross-host redirect should be rejected")
 	}
 	if hit {
-		t.Fatal("跳转目标被访问了——凭据已随重定向外泄")
+		t.Fatal("redirect target was accessed; credentials would have leaked")
 	}
 	assertNoSecret(t, err.Error(), leakProbeToken)
 }
 
-// TestSameHostRedirectAllowed 反向用例：同主机跳转（如末尾补斜杠）必须仍然可用，
-// 否则会把正常工作流一起挡掉。
+// TestSameHostRedirectAllowed is the inverse: same-host redirects (e.g. adding a
+// trailing slash) must remain usable or normal workflows would be blocked.
 func TestSameHostRedirectAllowed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/robot/send" {
-			// 同主机、同端口的跳转。
+			// Same host and port.
 			http.Redirect(w, r, "/robot/send/", http.StatusTemporaryRedirect)
 			return
 		}
@@ -231,6 +233,6 @@ func TestSameHostRedirectAllowed(t *testing.T) {
 	if _, err := (dingTalkChannel{}).Send(context.Background(),
 		map[string]any{"webhook": srv.URL + "/robot/send"},
 		Message{Items: []Item{{Severity: "high"}}}); err != nil {
-		t.Fatalf("同主机重定向不应被拒绝: %v", err)
+		t.Fatalf("same-host redirect should not be rejected: %v", err)
 	}
 }

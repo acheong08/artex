@@ -9,24 +9,26 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { AssetInterceptKind, AssetInterceptRuleInput } from "@/lib/types";
 
-// 用 NativeSelect（原生 <select>）而非 shadcn Select：这个编辑器会用在 Sheet 抽屉内，
-// shadcn Select 的下拉 portal 到 body、点击外部会触发抽屉的「点击外部关闭」误关；原生下拉无此问题。
+// Use NativeSelect (native <select>) rather than shadcn Select: this editor appears
+// inside a Sheet, where the shadcn dropdown portals to body and can accidentally
+// trigger the drawer's outside-click close behavior. Native dropdowns avoid this.
 export const ASSET_INTERCEPT_KIND_OPTIONS: {
   value: AssetInterceptKind;
   label: string;
   placeholder: string;
 }[] = [
-  { value: "exact_domain", label: "域名(全等)", placeholder: "example.gov.cn" },
-  { value: "exact_ip", label: "IP(全等)", placeholder: "203.0.113.10" },
-  { value: "exact_url", label: "URL(全等)", placeholder: "https://example.com/login" },
-  { value: "fuzzy_domain", label: "域名(模糊)", placeholder: ".gov.cn" },
-  { value: "fuzzy_ip", label: "IP(模糊)", placeholder: "203.0.113." },
-  { value: "fuzzy_url", label: "URL(模糊)", placeholder: "/admin" },
-  { value: "cidr", label: "CIDR 网段", placeholder: "192.168.0.0/16" },
+  { value: "exact_domain", label: "Exact domain", placeholder: "example.gov.cn" },
+  { value: "exact_ip", label: "Exact IP", placeholder: "203.0.113.10" },
+  { value: "exact_url", label: "Exact URL", placeholder: "https://example.com/login" },
+  { value: "fuzzy_domain", label: "Domain pattern", placeholder: ".gov.cn" },
+  { value: "fuzzy_ip", label: "IP pattern", placeholder: "203.0.113." },
+  { value: "fuzzy_url", label: "URL pattern", placeholder: "/admin" },
+  { value: "cidr", label: "CIDR range", placeholder: "192.168.0.0/16" },
 ];
 
-// AssetInterceptRulesEditor 是「拦截/允许规则」的受控多行编辑区（拦截block/允许allow +
-// 类型 + 匹配内容 + 备注），不自带持久化——由父组件决定何时提交。
+// AssetInterceptRulesEditor is a controlled multiline editor for intercept/allow
+// rules (block/allow + type + match value + note). It does not persist data; the
+// parent decides when to submit.
 export function AssetInterceptRulesEditor({
   value,
   onChange,
@@ -48,7 +50,7 @@ export function AssetInterceptRulesEditor({
       {value.map((r, i) => {
         const ph = ASSET_INTERCEPT_KIND_OPTIONS.find((o) => o.value === r.kind)?.placeholder ?? "";
         return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: 行无稳定 id，按索引受控即可
+          // biome-ignore lint/suspicious/noArrayIndexKey: Rows have no stable ID, so use the controlled index.
           <div key={i} className="flex items-center gap-2">
             <NativeSelect
               size="sm"
@@ -56,8 +58,8 @@ export function AssetInterceptRulesEditor({
               value={r.action}
               onChange={(e) => update(i, { action: e.target.value as "block" | "allow" })}
             >
-              <NativeSelectOption value="block">拦截</NativeSelectOption>
-              <NativeSelectOption value="allow">允许</NativeSelectOption>
+              <NativeSelectOption value="block">Block</NativeSelectOption>
+              <NativeSelectOption value="allow">Allow</NativeSelectOption>
             </NativeSelect>
             <NativeSelect
               size="sm"
@@ -79,7 +81,7 @@ export function AssetInterceptRulesEditor({
             />
             <Input
               className="w-[120px] shrink-0"
-              placeholder="备注(可选)"
+              placeholder="Note (optional)"
               value={r.note}
               onChange={(e) => update(i, { note: e.target.value })}
             />
@@ -96,7 +98,7 @@ export function AssetInterceptRulesEditor({
         );
       })}
       <Button type="button" size="sm" variant="outline" className="w-fit" onClick={add}>
-        <PlusIcon className="size-4" /> 添加一条
+        <PlusIcon className="size-4" /> Add rule
       </Button>
     </div>
   );

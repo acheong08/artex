@@ -27,44 +27,44 @@ func Causef(code, short, format string, args ...any) *AbortCause {
 
 var (
 	// Task-level execution context.
-	AbortPausedByUser = cause("paused_by_user", "用户暂停了任务",
-		"用户通过任务控制接口（POST /api/tasks/{id}/control，action=pause）暂停了任务。本次 Planner/Worker 运行被主动取消；运行中的意图会退回 frontier(open)，恢复任务后重新领取并从头执行")
-	AbortPausedByOrchestrator = cause("paused_by_orchestrator", "编排 Agent 暂停了任务",
-		"编排 Agent 调用了 pause_task 工具暂停本任务。本次 Planner/Worker 运行被主动取消；运行中的意图会退回 frontier(open)，恢复后重新执行")
-	AbortTaskDeleted = cause("task_deleted", "任务被删除",
-		"任务正在删除（DELETE /api/tasks/{id}），删除屏障已取消该任务正在运行的 Planner、Worker 和主 Agent；本次运行结果不会再被使用")
-	AbortPausedOnReload = cause("paused_on_reload", "后端恢复了任务的暂停状态",
-		"后端启动时根据数据库中持久化的状态恢复了任务暂停。本次运行被取消；正常情况下恢复阶段没有正在运行的 Agent")
-	AbortGoalMet = cause("goal_met", "规划者判定任务目标已达成",
-		"规划者判定任务目标已达成并将任务置为 done，随后取消仍在运行的 Worker；这些意图会标记为 stopped，而不是失败")
-	AbortSettleDrainTimeout = cause("settle_drain_timeout", "任务超时收尾的等待时间已用尽",
-		"任务到达 timeout 后等待正在运行的 Worker 优雅收尾，但 90 秒 drain 宽限仍不足，因此执行硬取消；意图会标记为 exhausted，收尾阶段已经写入的事实和资产会保留")
+	AbortPausedByUser = cause("paused_by_user", "Task paused by user",
+		"The user paused the task through the task control API (POST /api/tasks/{id}/control, action=pause). This Planner/Worker run was cancelled; running intents return to the frontier (open) and will be claimed and rerun from the beginning when the task resumes.")
+	AbortPausedByOrchestrator = cause("paused_by_orchestrator", "Task paused by orchestration agent",
+		"The orchestration agent paused this task with the pause_task tool. This Planner/Worker run was cancelled; running intents return to the frontier (open) and will be rerun when the task resumes.")
+	AbortTaskDeleted = cause("task_deleted", "Task deleted",
+		"The task is being deleted (DELETE /api/tasks/{id}). The deletion barrier cancelled its running Planner, Workers, and main agent; this run's result will no longer be used.")
+	AbortPausedOnReload = cause("paused_on_reload", "Task pause state restored by backend",
+		"On startup, the backend restored the task's paused state from the database. This run was cancelled; normally no agents are running during recovery.")
+	AbortGoalMet = cause("goal_met", "Planner determined that the task goal was met",
+		"The planner determined that the task goal was met and marked the task done, then cancelled any remaining Workers. Their intents are marked stopped, not failed.")
+	AbortSettleDrainTimeout = cause("settle_drain_timeout", "Task timeout wrap-up wait expired",
+		"After the task timed out, the system waited for running Workers to wrap up gracefully, but the 90-second drain grace period was insufficient, so they were force-cancelled. Intents are marked exhausted; facts and assets written during wrap-up are preserved.")
 
 	// Per-work context.
-	AbortKilledByPlanner = cause("killed_by_planner", "规划者终止了这条意图",
-		"规划者调用 kill_work 主动终止了这条意图，通常表示方向跑偏或已无继续价值；意图会标记为 stopped，不会自动重新领取")
-	AbortWorkPausedByUser = cause("work_paused_by_user", "用户暂停了这条 Worker 意图",
-		"用户暂停了正在运行的 Worker。本次调用被取消，意图转为 paused；已经登记的意图、事实、漏洞和活动记录全部保留，恢复后从头重新执行")
-	AbortWorkCancelledByUser = cause("work_cancelled_by_user", "用户删除了这条 Worker 意图",
-		"用户删除了正在运行的 Worker。本次调用被取消；Worker 退出写入区后，服务端按用户选择的删除模式处理该意图——假删除仅标记为已删除并保留全部产出，真删除会级联移除该意图及仅由它支撑的下游节点")
-	AbortWorkFinished = cause("work_finished", "Worker 已正常结束并释放 context",
-		"Worker 已正常结束，引擎在 detachWork 中释放其 context 资源。这不是运行中断；若它出现在中断消息中，说明取消与收场事件发生了竞态")
-	AbortPausedRaceGuard = cause("paused_race_guard", "任务暂停期间拒绝启动新运行",
-		"任务处于暂停状态时，引擎拒绝发出新的执行 context，用于防止 claim 与暂停之间的竞态导致 Worker 继续启动；已领取的意图会退回 frontier")
+	AbortKilledByPlanner = cause("killed_by_planner", "Intent terminated by planner",
+		"The planner terminated this intent with kill_work, usually because it went off course or is no longer useful. The intent is marked stopped and will not be claimed again automatically.")
+	AbortWorkPausedByUser = cause("work_paused_by_user", "Worker intent paused by user",
+		"The user paused the running Worker. This call was cancelled and the intent is now paused; the intent, facts, findings, and activity records already written are preserved. It will restart from the beginning when resumed.")
+	AbortWorkCancelledByUser = cause("work_cancelled_by_user", "Worker intent deleted by user",
+		"The user deleted the running Worker. This call was cancelled; after the Worker exits its write section, the server applies the selected deletion mode: soft deletion only marks it deleted and preserves all output, while hard deletion cascades to remove the intent and downstream nodes supported only by it.")
+	AbortWorkFinished = cause("work_finished", "Worker finished normally and released context",
+		"The Worker finished normally, and the engine released its context resources in detachWork. This is not an interrupted run; if this appears in an interruption message, cancellation raced with cleanup.")
+	AbortPausedRaceGuard = cause("paused_race_guard", "New run rejected while task is paused",
+		"The engine rejected a new execution context while the task is paused, preventing a race between claiming work and pausing from starting another Worker. Already claimed intents return to the frontier.")
 
 	// Main Agent and standalone conversation contexts.
-	AbortChatStoppedByUser = cause("chat_stopped_by_user", "用户停止了本轮对话",
-		"用户点击了停止，主动中止本轮主 Agent 或会话 Agent 运行。已经产生的活动记录会保留，可以继续发送下一条消息")
-	AbortChatPausedWithTask = cause("chat_paused_with_task", "任务暂停并中止了主 Agent 对话",
-		"用户暂停任务时，正在运行的主 Agent 对话也被同步取消。已经产生的活动记录会保留；恢复任务后不会自动重放本轮消息")
-	AbortChatTurnFinished = cause("chat_turn_finished", "本轮对话已正常结束并释放 context",
-		"本轮对话已正常结束，服务端正在释放该轮 context 资源。这不是运行中断；若它出现在中断消息中，说明取消与收场事件发生了竞态")
+	AbortChatStoppedByUser = cause("chat_stopped_by_user", "Current conversation stopped by user",
+		"The user clicked Stop to interrupt the main agent or session agent run. Activity records already produced are preserved; you can send another message.")
+	AbortChatPausedWithTask = cause("chat_paused_with_task", "Task paused and main-agent conversation cancelled",
+		"Pausing the task also cancelled the running main-agent conversation. Activity records already produced are preserved; this message will not be replayed automatically when the task resumes.")
+	AbortChatTurnFinished = cause("chat_turn_finished", "Conversation turn finished normally and released context",
+		"This conversation turn finished normally, and the server is releasing its context resources. This is not an interrupted run; if this appears in an interruption message, cancellation raced with cleanup.")
 
 	// Process-level and per-run hard backstop.
-	AbortShutdown = cause("shutdown", "后端进程正在关闭",
-		"后端进程收到 SIGINT 或 SIGTERM，正在重启、更新或关闭。所有运行中的 Agent 会被取消；重启后残留的 running 意图会重置为 open 并重新执行")
-	AbortRunHardTimeout = cause("run_hard_timeout", "单次运行的硬超时兜底已触发",
-		"单次运行超过软墙钟预算及额外宽限，说明模型请求或某个工具长时间没有返回，导致正常的回合边界收尾无法执行。请重点检查中断前最后一个未返回的工具调用")
+	AbortShutdown = cause("shutdown", "Backend process is shutting down",
+		"The backend received SIGINT or SIGTERM and is restarting, updating, or shutting down. All running agents will be cancelled; after restart, remaining running intents are reset to open and rerun.")
+	AbortRunHardTimeout = cause("run_hard_timeout", "Per-run hard-timeout backstop triggered",
+		"The run exceeded its soft wall-clock budget plus the additional grace period. A model request or tool likely failed to return for an extended time, preventing normal wrap-up at a turn boundary. Check the last tool call that had not returned before interruption.")
 )
 
 // AbortReason resolves the named cause attached to a cancelled run context.
@@ -79,11 +79,11 @@ func AbortReason(ctx context.Context) (code, short, text string, ok bool) {
 	}
 	switch {
 	case errors.Is(c, context.DeadlineExceeded):
-		return "deadline_exceeded", "上游 context 到达 deadline",
-			"上游 context 到达 deadline，但设置方没有通过 WithTimeoutCause 附加具名原因: " + c.Error(), true
+		return "deadline_exceeded", "Upstream context deadline reached",
+			"Upstream context deadline reached, but the caller did not attach a named cause with WithTimeoutCause: " + c.Error(), true
 	case errors.Is(c, context.Canceled):
-		return "canceled_no_cause", "取消方未附加具名原因",
-			"上游 context 被取消，但取消方没有通过 context.WithCancelCause 附加具名原因；请在 agent/cancelcause.go 登记原因并接入该取消点", true
+		return "canceled_no_cause", "Cancelling caller did not attach a named cause",
+			"Upstream context was cancelled, but the caller did not attach a named cause with context.WithCancelCause; register a cause in agent/cancelcause.go and wire it to the cancellation point.", true
 	default:
 		return "other", firstLine(c.Error(), 80), c.Error(), true
 	}
