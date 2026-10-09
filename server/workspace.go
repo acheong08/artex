@@ -90,7 +90,7 @@ func (s *Server) wsList(w http.ResponseWriter, r *http.Request) {
 			MTime: info.ModTime().UnixMilli(),
 		})
 	}
-	// 目录在前，各自按名称排序。
+	// Directories first; sort each group by name.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Dir != out[j].Dir {
 			return out[i].Dir

@@ -93,7 +93,7 @@ func TestInterceptDetailHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	deletedReply := do(http.MethodGet, fmt.Sprintf("/api/intercept/history/%d/execution?conversation=%d", sourceID, conv.ID), "", true)
-	if deletedReply.Code != 410 || !strings.Contains(deletedReply.Body.String(), "对话已被删除") {
+	if deletedReply.Code != 410 || !strings.Contains(deletedReply.Body.String(), "conversation was deleted") {
 		t.Fatalf("deleted conversation: %d %s", deletedReply.Code, deletedReply.Body.String())
 	}
 

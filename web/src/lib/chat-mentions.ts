@@ -1,13 +1,13 @@
 export const mentionKinds = [
-  { kind: "finding", label: "Finding", tokenLabel: "漏洞", alias: "finding" },
-  { kind: "asset", label: "Asset", tokenLabel: "资产", alias: "asset" },
-  { kind: "company", label: "Company", tokenLabel: "企业", alias: "company" },
-  { kind: "endpoint", label: "Endpoint", tokenLabel: "接口", alias: "api" },
+  { kind: "finding", label: "Finding", tokenLabel: "Finding", alias: "finding" },
+  { kind: "asset", label: "Asset", tokenLabel: "Asset", alias: "asset" },
+  { kind: "company", label: "Company", tokenLabel: "Company", alias: "company" },
+  { kind: "endpoint", label: "Endpoint", tokenLabel: "Endpoint", alias: "api" },
   { kind: "ip", label: "IP", tokenLabel: "IP", alias: "ip" },
-  { kind: "app", label: "Application", tokenLabel: "应用", alias: "app" },
-  { kind: "root_domain", label: "Domain", tokenLabel: "域名", alias: "domain" },
-  { kind: "subdomain", label: "Subdomain", tokenLabel: "子域名", alias: "subdomain" },
-  { kind: "service", label: "Service", tokenLabel: "服务", alias: "service" },
+  { kind: "app", label: "Application", tokenLabel: "Application", alias: "app" },
+  { kind: "root_domain", label: "Domain", tokenLabel: "Domain", alias: "domain" },
+  { kind: "subdomain", label: "Subdomain", tokenLabel: "Subdomain", alias: "subdomain" },
+  { kind: "service", label: "Service", tokenLabel: "Service", alias: "service" },
 ] as const;
 
 export type MentionKind = (typeof mentionKinds)[number]["kind"];
@@ -46,16 +46,16 @@ export function mentionSearch(query: string) {
 }
 
 export function mentionToken(item: ChatMention) {
-  const kind = mentionKinds.find((entry) => entry.kind === item.kind)?.tokenLabel ?? "资产";
+  const kind = mentionKinds.find((entry) => entry.kind === item.kind)?.tokenLabel ?? "Asset";
   const label = item.label
-    .replace(/[[\]]/g, (char) => (char === "[" ? "（" : "）"))
+    .replace(/[[\]]/g, (char) => (char === "[" ? "(" : ")"))
     .replace(/\s+/g, " ")
     .slice(0, 100);
   return `@[${kind}#${item.id} ${label}]`;
 }
 
 export function selectedMentions(value: string) {
-  return [...value.matchAll(/@\[(漏洞|资产|企业|接口|IP|应用|域名|子域名|服务)#([0-9]+)(?: ([^\]\r\n]*))?\]/g)].map(
+  return [...value.matchAll(/@\[(Finding|Asset|Company|Endpoint|IP|Application|Domain|Subdomain|Service)#([0-9]+)(?: ([^\]\r\n]*))?\]/g)].map(
     (match) => {
       const kind = mentionKinds.find((entry) => entry.tokenLabel === match[1]);
       const detail = match[3] ? ` · ${match[3]}` : "";

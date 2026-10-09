@@ -195,7 +195,7 @@ See the table in [4.4](#44-exact-filter) for asset types that support `filter.pr
 
 ### 4.1 Asset Types (`asset_type`)
 
-`asset`、`RootDomain`、`subdomain`、`app`、`mp`、`UrlScan`、`SensitiveResult`、`DirScanResult`、`crawler`、`vulnerability`、`PageMonitoring`、`IPAsset`、`SubdomainTakerResult`
+`asset`, `RootDomain`, `subdomain`, `app`, `mp`, `UrlScan`, `SensitiveResult`, `DirScanResult`, `crawler`, `vulnerability`, `PageMonitoring`, `IPAsset`, `SubdomainTakerResult`
 
 Aliases: `web` → `asset`, `vuln` → `vulnerability`, `ip` → `IPAsset`, `url` → `UrlScan`
 
@@ -259,8 +259,8 @@ Custom DSL (**not SQL**):
 - `domain=^example.com` (prefix match, uses index)
 - `ip==192.168.1.1`
 - `task=="some-task-name"`
-- `level==high`（vulnerability）
-- `statuscode==200`（DirScanResult）
+- `level==high` (vulnerability)
+- `statuscode==200` (DirScanResult)
 
 Use `=` only when fuzzy containment is needed, for example `title=admin` (does not use an index; narrow the scope with a project filter or other conditions).
 
@@ -346,7 +346,7 @@ Other types ignore `sort` and use the default time ordering.
 
 ## 5. Scan Template Module Names
 
-`TargetHandler`、`SubdomainScan`、`SubdomainSecurity`、`PortScanPreparation`、`PortScan`、`PortFingerprint`、`AssetMapping`、`AssetHandle`、`URLScan`、`WebCrawler`、`URLSecurity`、`DirScan`、`VulnerabilityScan`、`PassiveScan`
+`TargetHandler`, `SubdomainScan`, `SubdomainSecurity`, `PortScanPreparation`, `PortScan`, `PortFingerprint`, `AssetMapping`, `AssetHandle`, `URLScan`, `WebCrawler`, `URLSecurity`, `DirScan`, `VulnerabilityScan`, `PassiveScan`
 
 ---
 

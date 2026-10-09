@@ -9,19 +9,24 @@ import (
 	"github.com/Autumn-27/artex/db"
 )
 
-// 总览「约束管理」的人工 CRUD 接口 + 注入范围开关的解析。操作约束(allow/deny)与 agent 侧的
-// set_constraints 工具写同一张 task_constraints 表;这里是人类在 UI 上直接增删改。约束仅是
-// 提示上下文——增删改后【不】通知 planner,下一轮规划自然读库生效(按产品决策)。每个变更 handler
-// 都走 beginTaskOperation/decInflight,避免与任务删除竞态(与目标/意图 CRUD 一致)。
+// Human-facing CRUD endpoints for overview constraint management and resolution of
+// constraint-injection settings. Operational constraints (allow/deny) and the
+// agent-side set_constraints tool share task_constraints; this API lets people edit
+// them directly in the UI. Constraints are prompt context only: edits do not notify
+// the planner; the next planning round reads them from the database (product decision).
+// Each mutation uses beginTaskOperation/decInflight to avoid races with task deletion,
+// matching goal/intent CRUD.
 
-// 注入范围开关的 settings key,默认都开(GetBool 第二参数 = true)。
+// Settings keys for injection toggles; all are enabled by default (GetBool's second argument = true).
 const (
 	settingConstraintsInjectPlanner = "constraints_inject_planner"
 	settingConstraintsInjectWorker  = "constraints_inject_worker"
 )
 
-// constraintInjectPlanner / constraintInjectWorker 报告是否把操作约束注入对应 agent 的
-// 系统提示(默认开)。作为 resolver 传给 planner/worker,每轮读 → 改开关即时生效。
+// constraintInjectPlanner / constraintInjectWorker report whether operational
+// constraints are injected into the corresponding agent's system prompt (enabled
+// by default). Passed as resolvers to planner/worker and read each round, so toggle
+// changes take effect immediately.
 func (s *Server) constraintInjectPlanner() bool {
 	return s.m.pg.GetBool(settingConstraintsInjectPlanner, true)
 }
@@ -30,7 +35,7 @@ func (s *Server) constraintInjectWorker() bool {
 	return s.m.pg.GetBool(settingConstraintsInjectWorker, true)
 }
 
-// listConstraints 返回本任务的全部操作约束(allow 在前、deny 在后)。
+// listConstraints returns all operational constraints for this task (allow first, then deny).
 func (s *Server) listConstraints(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.m.Task(r.PathValue("id"))
 	if !ok {
@@ -45,7 +50,7 @@ func (s *Server) listConstraints(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"constraints": constraintDTOs(rows)})
 }
 
-// addConstraint 人工新增一条操作约束(kind=allow|deny)。不通知 planner。
+// addConstraint adds a human-authored operational constraint (kind=allow|deny). Does not notify the planner.
 func (s *Server) addConstraint(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.m.Task(r.PathValue("id"))
 	if !ok {
@@ -84,7 +89,7 @@ func (s *Server) addConstraint(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ConstraintDTO{ID: strconv.FormatInt(id, 10), Kind: kind, Text: text, Origin: "human"})
 }
 
-// editConstraint 人工修改一条约束(kind + text)。不通知 planner。
+// editConstraint edits a constraint (kind + text). Does not notify the planner.
 func (s *Server) editConstraint(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.m.Task(r.PathValue("id"))
 	if !ok {
@@ -127,7 +132,7 @@ func (s *Server) editConstraint(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ConstraintDTO{ID: strconv.FormatInt(cid, 10), Kind: kind, Text: text})
 }
 
-// deleteConstraint 人工删除一条约束。不通知 planner。
+// deleteConstraint deletes a constraint. Does not notify the planner.
 func (s *Server) deleteConstraint(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.m.Task(r.PathValue("id"))
 	if !ok {

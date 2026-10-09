@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 // ── DSL autocomplete ──────────────────────────────────────────────────────────
-// Shared by the global asset view (/function/assets) and the per-task 测试资产
+// Shared by the global asset view (/function/assets) and the per-task test-asset
 // search, so both search boxes behave and look identical.
 
 const DSL_FIELDS: { name: string; desc: string; ops: { op: string; desc: string }[] }[] = [
@@ -261,7 +261,7 @@ const KIND_STYLE: Record<string, string> = {
 };
 
 // AssetDslSearch is the shared DSL search box: a monospace input with a
-// field/operator/logic autocomplete popover and a status line ("找到 N 条" /
+// field/operator/logic autocomplete popover and a status line ("N results found" /
 // error / loading). Used by both the global asset view and the per-task view.
 export function AssetDslSearch({
   query,

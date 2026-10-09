@@ -95,9 +95,9 @@ func TestTraceSequentialIdenticalCallsAndRunIsolation(t *testing.T) {
 }
 
 func TestTraceBoundsAndMissingResult(t *testing.T) {
-	ctx, trace := WithTrace(context.Background(), strings.Repeat("中文", promptLimit), nil)
+	ctx, trace := WithTrace(context.Background(), strings.Repeat("Chinese text ", promptLimit), nil)
 	for range contextLimit + 5 {
-		trace.Append(db.InterceptContextEntry{Kind: "text", Text: strings.Repeat("中", entryLimit)})
+		trace.Append(db.InterceptContextEntry{Kind: "text", Text: strings.Repeat("C", entryLimit)})
 	}
 	trace.Start("a", "Read", []byte(`{}`))
 	a := auditFor(WithCall(ctx, "Read", []byte(`{}`)), Decision{}, nil, "pending")

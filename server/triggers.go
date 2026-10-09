@@ -6,7 +6,7 @@ import (
 	"github.com/Autumn-27/artex/db"
 )
 
-// ---------- P3 agent triggers (仅自定义 agent) ----------
+// ---------- P3 agent triggers (custom agents only) ----------
 
 func (s *Server) pgListTriggers(w http.ResponseWriter, r *http.Request) {
 	pg, a, ok := s.agentByKey(w, r)

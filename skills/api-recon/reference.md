@@ -49,7 +49,7 @@ Trace `isLogin = f(getUser())` → `getUser = decode(storage.read(KEY))` and det
 ```bash
 grep -rhoaE '.{0,60}(interceptors\.response|axios|request\.use).{0,120}' js | head
 grep -rhoaE '.{0,40}(response_code|errcode|errno|\bcode\b|\bret\b|\bstatus\b)\s*[=!]==?\s*[\-0-9]{1,4}.{0,60}' js | head -20
-grep -rhoaE '.{0,40}(未登录|请重新登录|登录已过期|unauthorized|登录失效|授权|token.{0,10}invalid).{0,40}' js | head
+grep -rhoaE '.{0,40}(not[[:space:]]*logged[[:space:]]*in|please[[:space:]]*log[[:space:]]*in|login[[:space:]]*expired|unauthorized|login[[:space:]]*failed|authorization|token.{0,10}invalid).{0,40}' js | head
 grep -rhoaE '.{0,30}(location\.href|router\.(push|replace)|navigate)\([^)]*login[^)]*\)' js | head
 ```
 
@@ -151,7 +151,7 @@ Read the consumer code to confirm how `getResultTree(tree, permissions)` filters
 ```
 
 Field descriptions:
-- `runtimeMode`：`depth`（Puppeteer）、`coverage`（browser MCP）、`both`
+- `runtimeMode`: `depth` (Puppeteer), `coverage` (browser MCP), `both`
 - `cookies[].value` prefixes: `b64json:` → base64(JSON); `json:` → raw JSON; no prefix → literal value
 - `forward: true` forwards real requests and rewrites status fields; `false` uses fully offline stubs
 - `mockTier`: layers enabled by preload in coverage mode, e.g. `L1+L2`, `L1+L2+L3`

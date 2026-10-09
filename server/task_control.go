@@ -149,7 +149,8 @@ func (s *Server) applyTaskControlWithCause(t *Task, action string, pauseCause er
 	return out, nil
 }
 
-// intentSummaryOf 取意图 payload 里的 summary,供删除通知在意图节点消失(真删除)前留档。
+// intentSummaryOf extracts the summary from an intent payload so deletion
+// notifications retain it before the node disappears (hard deletion).
 func intentSummaryOf(n *db.Node) string {
 	if n == nil {
 		return ""
@@ -201,12 +202,14 @@ func (s *Server) applyIntentControl(ctx context.Context, t *Task, iid int64, act
 		t.Notify()
 		out.State = "open"
 	case "cancel":
-		// 删除支持两种模式:
-		//   soft(默认,假删除):意图停到 state='deleted'、删除原因记入 delete_reason 字段,
-		//     保留意图节点与全部产出/血缘,不再在图上另挂 fact。
-		//   hard(真删除):物理删除该意图及"仅由它支撑"的独占子孙节点(级联到叶子),避免留下
-		//     孤立数据;共享节点、goal、任务根事实保留。
-		// 两种模式都用 cancelled 触发告知 planner(意图内容 + 删除原因),让它据此重规划。
+		// Deletion has two modes:
+		//   soft (default/logical deletion): set state='deleted' and store the reason
+		//     in delete_reason; retain the intent and all outputs/lineage without adding a fact.
+		//   hard (physical deletion): delete the intent and exclusive descendants
+		//     supported only by it, cascading to leaves to avoid orphaned data; retain
+		//     shared nodes, goals, and the task's root fact.
+		// Both modes use cancelled to tell the planner the intent and deletion reason
+		// so it can replan.
 		if node.State != "running" && node.State != "paused" && node.State != "open" {
 			return out, fmt.Errorf("only open, running, or paused intents can be deleted")
 		}
@@ -228,7 +231,7 @@ func (s *Server) applyIntentControl(ctx context.Context, t *Task, iid int64, act
 			s.cancelWorkerSide(t.ID, t.ExpID, iid)
 			t.NotifyCancelled(iid, summary, reason)
 			out.Deleted = &cleanup
-			out.State = "" // 节点已删除,前端据 Deleted 从列表移除
+			out.State = "" // Node deleted; the frontend removes it from the list based on Deleted.
 		} else {
 			if _, err := t.Store.SoftDeleteIntent(iid, reason); err != nil {
 				return out, err

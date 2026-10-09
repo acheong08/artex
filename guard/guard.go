@@ -3,7 +3,7 @@
 // Every tool call passes through the PreToolUse hook before executing.
 // (The RoE authorization-scope mechanism was removed; a replacement may be added
 // later.) Destructive/exfil gating is no longer hard-coded here — it lives in the
-// DB intercept rules (seeded as ordinary [内置] rules, so users can disable or
+// DB intercept rules (seeded as ordinary [built-in] rules, so users can disable or
 // delete them), evaluated via applyIntercept.
 package guard
 
@@ -100,7 +100,8 @@ func (g *Guard) applyIntercept(ctx context.Context, ev hook.Event) hook.Result {
 	}
 	switch dec.Action {
 	case "deny":
-		// 观测:deny 命中不阻塞审批,直接记一条 denied（历史/任务拦截页可见）。
+		// Observe: a matched deny rule does not block approval; record it as denied
+		// so it appears on the history/task interception pages.
 		g.interceptor.Log(ctx, intercept.ConvIDFromContext(ctx), dec, ev.ToolName, ev.Input, "denied")
 		return g.block(ev.ToolName, systemBlockMessage(dec.Message), "")
 	case "allow":

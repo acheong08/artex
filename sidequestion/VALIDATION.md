@@ -80,7 +80,7 @@ The preferred model, `grok-4.6`, was probed through the OpenAI-compatible endpoi
 | Ask a follow-up after actually stopping/restarting the Go service | Retained the previous 3 side-question history items and answered about assets, marker, and title directly from the persisted snapshot, without rerunning the main Agent |
 | Use a Grok non-streaming configuration in a new conversation | Correctly answered about the asset and `ATOMIC-0910`; returned and saved usage: input 11734, output 138, cache_read 11520 |
 
-For the asset case, the main conversation used WebFetch and Bash/curl to read the public homepage at `https://id.redhaze.top/home`. Its exact page title was “红幕科技 RedHaze Group · 全球综合集团门户”. Bash staged the response in a local test file; no writes were made remotely. This is verified separately from the fact that the side question executed no tools.
+For the asset case, the main conversation used WebFetch and Bash/curl to read the public homepage at `https://id.redhaze.top/home`. Its page title, translated into English, is “RedHaze Technology · Global Conglomerate Portal”. Bash staged the response in a local test file; no writes were made remotely. This is verified separately from the fact that the side question executed no tools.
 
 Main transcript checksum: `e7e61f135a4a120954b539f357e8c4205d7d5cd7460dcaf3dc0fd066463e1d00`.
 

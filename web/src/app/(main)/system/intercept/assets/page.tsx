@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import type { AssetInterceptKind, AssetInterceptRule } from "@/lib/types";
 
-// ---- kind 元信息 ----
+// ---- Kind metadata ----
 
 const KIND_OPTIONS: { value: AssetInterceptKind; label: string; group: string; placeholder: string }[] = [
   { value: "exact_domain", label: "Domain (exact)", group: "Exact match", placeholder: "example.gov.cn" },
@@ -77,7 +77,8 @@ type RuleForm = {
 
 const defaultForm = (): RuleForm => ({ enabled: true, kind: "fuzzy_domain", pattern: "", note: "" });
 
-// 前端轻校验（与后端一致：仅 exact_ip / cidr 做格式校验，其余交后端）。
+// Lightweight frontend validation, matching the backend: validate only exact_ip and
+// cidr formats here; let the backend validate the rest.
 function frontValidate(form: RuleForm): string | null {
   const p = form.pattern.trim();
   if (!p) return "Match value cannot be empty";

@@ -160,8 +160,8 @@ func (d *DB) FindingRetestForConversation(ctx context.Context, conversationID in
 // FailPendingRetestForConversation seals a conversation's unfinished retest when
 // the runner could not even load it — the retest ID is unknown on that path, so
 // the conversation ID is the only handle. Without it a transient read error
-// leaves the row 'pending' forever: the findings list keeps showing 复测中 and
-// every later 发起复测 is deduped against a run that is not happening, with only
+// leaves the row 'pending' forever: the findings list keeps showing "Retesting" and
+// every later retest request is deduplicated against a run that is not happening, with only
 // a process restart (RecoverFindingRetests) able to clear it.
 func (d *DB) FailPendingRetestForConversation(conversationID int64, reason string) error {
 	_, err := d.Exec(`UPDATE finding_retests SET status='failed', error=$2, finished_at=now()
@@ -228,7 +228,7 @@ func (d *DB) FinishFindingRetest(id int64, status, reason string) error {
 	var finalStatus, verdict string
 	err = tx.QueryRow(`UPDATE finding_retests SET
 	status=CASE WHEN $2='completed' AND verdict='' THEN 'failed' ELSE $2 END,
-	error=CASE WHEN $2='completed' AND verdict='' THEN 'Agent 未保存复测结论，请查看会话后重新复测' ELSE $3 END,
+	error=CASE WHEN $2='completed' AND verdict='' THEN 'Agent did not save a retest verdict. Review the session and retry the retest.' ELSE $3 END,
 	finished_at=now() WHERE id=$1 AND status IN ('pending','running') RETURNING status,verdict`, id, status, reason).Scan(&finalStatus, &verdict)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil // A replay must not overwrite a later manual triage decision.
@@ -237,15 +237,15 @@ func (d *DB) FinishFindingRetest(id int64, status, reason string) error {
 		return err
 	}
 	if finalStatus == "completed" && verdict == "fixed" {
-		// 走带通知的版本，与人工在详情页改状态共用同一套语义。
+		// Use the notifying version so this shares semantics with a manual status change on the detail page.
 		//
-		// 此前这里是裸的 UPDATE：复测判「已修复」时状态确实变了，但配了
-		// on_status_change 的渠道完全收不到推送——状态在界面上悄悄变了，
-		// 运维要打开平台才知道。状态更新与推送事件必须一起落库，
-		// SetFindingStatusTx 内部处理了「状态没变就不登记」等细节。
-		// 用 context.Background()：本函数整条都是无 ctx 的旧风格（d.Begin()/
-		// tx.QueryRow/tx.Exec），没有可传递的取消信号，硬加一个 ctx 参数会
-		// 牵动 server 侧调用点与多处测试，超出本次改动的范围。
+		// This used to be a bare UPDATE: when a retest verdict was "fixed", the status changed
+		// but channels with on_status_change received no notification. The UI changed silently,
+		// leaving operators to discover it only by opening the platform. Status and event must
+		// be persisted together; SetFindingStatusTx handles details such as skipping unchanged statuses.
+		// Use context.Background(): this entire function uses the older no-context style (d.Begin()/
+		// tx.QueryRow/tx.Exec), with no cancellation signal to propagate. Adding a context parameter
+		// would affect server call sites and multiple tests, beyond the scope of this change.
 		if _, _, _, _, err := SetFindingStatusTx(context.Background(), tx, findingID, FindingFixed); err != nil {
 			return err
 		}

@@ -347,7 +347,7 @@ func (s *Server) listAssets(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// task_id scopes the DSL search to a task's assets (the task detail
-		// "测试资产" search); 0 means the global asset view.
+		// "test assets" search); 0 means the global asset view.
 		taskID, _ := strconv.ParseInt(q.Get("task_id"), 10, 64)
 		total, err = as.CountDSL(dsl, typ, taskID)
 		if err == nil && offset < total {

@@ -394,7 +394,7 @@ SELECT intent.id, asset.id, asset.type,
          ELSE '#' || asset.id::text
        END,
        COALESCE(link.source,'anchor'),
-       COALESCE(NULLIF(link.source_summary,''), '意图在黑板中锚定该资产'),
+       COALESCE(NULLIF(link.source_summary,''), 'Intent anchored this asset on the board'),
        link.source_node_id, context.task_id, context.inherited
 FROM context
 JOIN exploration_nodes intent ON intent.exploration_id=context.exploration_id AND intent.kind='intent'

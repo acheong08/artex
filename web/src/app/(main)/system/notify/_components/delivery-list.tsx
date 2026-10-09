@@ -14,7 +14,8 @@ import { api } from "@/lib/api";
 import { statusMeta, toneClasses } from "@/lib/status";
 import type { NotificationChannel, NotificationDelivery } from "@/lib/types";
 
-// DeliveryList 是投递记录表：可按渠道与状态筛选，失败项可手动重发。
+// DeliveryList shows delivery records, filterable by channel and status, with manual
+// retry for failed items.
 export function DeliveryList({ channels }: { channels: NotificationChannel[] }) {
   const [rows, setRows] = React.useState<NotificationDelivery[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -146,7 +147,8 @@ export function DeliveryList({ channels }: { channels: NotificationChannel[] }) 
                   <TableCell className="text-muted-foreground text-sm">{d.attempts}</TableCell>
                   <TableCell className="text-muted-foreground max-w-md text-xs break-all">{d.last_error}</TableCell>
                   <TableCell>
-                    {/* 只有失败/跳过的才给重发入口：已送达的重发会造成重复推送。 */}
+                    {/* Only failed or skipped deliveries can be retried; retrying a
+                        delivered message would send a duplicate. */}
                     {(d.state === "failed" || d.state === "skipped") && (
                       <Button size="sm" variant="outline" onClick={() => retry(d.id)}>
                         <RotateCcwIcon /> Retry

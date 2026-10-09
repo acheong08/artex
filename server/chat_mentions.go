@@ -17,10 +17,10 @@ const maxChatMentions = 10
 
 // The visible token survives drafts, uploads, retries and conversation history.
 // Labels are only for display: the server trusts only the type and numeric ID.
-var chatMentionPattern = regexp.MustCompile(`@\[(漏洞|资产|企业|接口|IP|应用|域名|子域名|服务)#([0-9]+)(?: [^\]\r\n]*)?\]`)
+var chatMentionPattern = regexp.MustCompile(`@\[(Finding|Asset|Company|Endpoint|IP|App|Domain|Subdomain|Service)#([0-9]+)(?: [^\]\r\n]*)?\]`)
 var chatMentionKinds = map[string]string{
-	"漏洞": "finding", "资产": "asset", "企业": "company", "接口": "endpoint",
-	"IP": "ip", "应用": "app", "域名": "root_domain", "子域名": "subdomain", "服务": "service",
+	"Finding": "finding", "Asset": "asset", "Company": "company", "Endpoint": "endpoint",
+	"IP": "ip", "App": "app", "Domain": "root_domain", "Subdomain": "subdomain", "Service": "service",
 }
 
 type chatMentionRef struct {

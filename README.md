@@ -291,25 +291,25 @@ flowchart TB
   subgraph FE["Frontend Next.js (embedded in the single binary with go:embed)"]
     UI["Dashboard · Tasks · Assets · Coverage Graph · Traffic · Workspace · System Settings"]
   end
-  subgraph SRV["server（Go net/http）"]
-    API["REST /api/*　JWT authentication　SSE"]
+  subgraph SRV["server (Go net/http)"]
+    API["REST /api/* | JWT authentication | SSE"]
     ENG["engine scheduling loop"]
-    MGR["Manager　task/engine/store lifecycle"]
+    MGR["Manager | task/engine/store lifecycle"]
   end
-  subgraph AG["agent（norma SDK）"]
-    GO["goals　goal decomposition + scope extraction"]
-    PL["planner　planner (sole intent generator)"]
-    WK["worker　executor ×N"]
-    MA["mainagent　human-in-the-loop"]
+  subgraph AG["agent (norma SDK)"]
+    GO["goals | goal decomposition + scope extraction"]
+    PL["planner | planner (sole intent generator)"]
+    WK["worker | executor ×N"]
+    MA["mainagent | human-in-the-loop"]
   end
   subgraph DB["PostgreSQL"]
-    AGRAPH["Asset Graph　assets / companies / task_scope"]
-    EGRAPH["Exploration Graph　exploration_nodes / anchors / activity"]
+    AGRAPH["Asset Graph | assets / companies / task_scope"]
+    EGRAPH["Exploration Graph | exploration_nodes / anchors / activity"]
   end
   subgraph SUB["Supporting subsystems"]
-    PROXY["Traffic-recording proxy　MITM + CA audit trail"]
-    GUARD["guard / intercept　tool approval gate"]
-    ENR["enrich　asynchronous DNS / HTTP enrichment"]
+    PROXY["Traffic-recording proxy | MITM + CA audit trail"]
+    GUARD["guard / intercept | tool approval gate"]
+    ENR["enrich | asynchronous DNS / HTTP enrichment"]
     EXT["MCP · skills · memory · reports"]
   end
 
@@ -435,15 +435,15 @@ Real attack chains are often **multi-step sequences with dependencies** (for exa
 flowchart TB
   subgraph TODO["Shared todolist (per task · persists across wake-ups)"]
     direction LR
-    T1["1 Find injection point　[Completed]"]
-    T2["2 Obtain credentials　[In progress]"]
-    T3["3 Move laterally　[Prerequisites pending]"]
-    T4["4 Escalate privileges　[Prerequisites pending]"]
+    T1["1 Find injection point | [Completed]"]
+    T2["2 Obtain credentials | [In progress]"]
+    T3["3 Move laterally | [Prerequisites pending]"]
+    T4["4 Escalate privileges | [Prerequisites pending]"]
     T1 -.prerequisite satisfied.-> T2 -.-> T3 -.-> T4
   end
-  R1["Round 1 wake-up　Dispatch intent ①"] --> T1
-  R2["Round 2 (① produced a fact)　Dispatch intent ②"] --> T2
-  R3["Round 3 (② produced a fact)　Dispatch intent ③"] --> T3
+  R1["Round 1 wake-up | Dispatch intent 1"] --> T1
+  R2["Round 2 (intent 1 produced a fact) | Dispatch intent 2"] --> T2
+  R3["Round 3 (intent 2 produced a fact) | Dispatch intent 3"] --> T3
 ```
 
 This keeps attack chains **progressing reliably, without duplication or reordering** even in an event-driven, stateless-session environment—a key part of ARTEX's ability to autonomously complete multi-step exploitation chains.

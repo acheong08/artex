@@ -347,7 +347,7 @@ export default function AssetsPage() {
           </TabsList>
         </div>
 
-        {/* 企业 */}
+        {/* Companies */}
         <TabsContent value="company" className="mt-0 flex min-h-0 flex-1 flex-col">
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden py-0">
             <div className="min-h-0 flex-1 overflow-auto">
@@ -416,7 +416,7 @@ export default function AssetsPage() {
           </Card>
         </TabsContent>
 
-        {/* 根域名 */}
+        {/* Root domains */}
         <TabsContent value="root_domain" className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
           {searchBox}
           <AssetCard
@@ -504,7 +504,7 @@ export default function AssetsPage() {
           </AssetCard>
         </TabsContent>
 
-        {/* 子域名 */}
+        {/* Subdomains */}
         <TabsContent value="subdomain" className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
           {searchBox}
           <AssetCard
@@ -546,7 +546,7 @@ export default function AssetsPage() {
           </AssetCard>
         </TabsContent>
 
-        {/* 应用 */}
+        {/* Applications */}
         <TabsContent value="app" className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
           {searchBox}
           <AssetCard
@@ -586,7 +586,7 @@ export default function AssetsPage() {
           </AssetCard>
         </TabsContent>
 
-        {/* 服务 */}
+        {/* Services */}
         <TabsContent value="service" className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
           {searchBox}
           <AssetCard
@@ -682,7 +682,7 @@ export default function AssetsPage() {
           </AssetCard>
         </TabsContent>
 
-        {/* 接口 */}
+        {/* Endpoints */}
         <TabsContent value="endpoint" className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
           {searchBox}
           <AssetCard
@@ -951,8 +951,9 @@ function CompanyAvatar({ name, logo }: { name: string; logo?: string }) {
   );
 }
 
-// 后端返回的 warnings 说的是既有数据问题（不是本次提交的行有错），保存本身已经
-// 成功。给更长的停留时间，因为它需要用户去处理具体的资产，扫一眼标题不够。
+// Backend warnings describe existing data issues, not errors in the submitted rows;
+// the save itself succeeded. Keep the toast visible longer because users need time
+// to identify and address the affected assets.
 function showScopeWarnings(warnings?: string[]) {
   for (const warning of warnings ?? []) {
     toast.warning(warning, { duration: 15000 });
@@ -971,7 +972,7 @@ function savedScopeText(company: Company): string {
     .join("\n");
 }
 
-// 新增企业使用与任务、LLM 编辑一致的右侧抽屉。
+// Add companies in the same right-side drawer used for task and LLM editing.
 function CompanyDialog({ onSaved }: { onSaved: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -1051,7 +1052,7 @@ function CompanyDialog({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-// 编辑（覆盖）资产范围弹窗
+// Edit (replace) asset scope dialog.
 function EditScopeDialog({ company, onSaved }: { company: Company; onSaved: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [scopeText, setScopeText] = React.useState("");
@@ -1134,7 +1135,7 @@ function EditScopeDialog({ company, onSaved }: { company: Company; onSaved: () =
   );
 }
 
-// 追加资产范围弹窗
+// Append asset scope dialog.
 function AppendScopeDialog({ company, onSaved }: { company: Company; onSaved: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [scopeText, setScopeText] = React.useState("");

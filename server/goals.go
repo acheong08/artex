@@ -18,13 +18,16 @@ type goalSpec struct {
 }
 
 // launchTask runs the shared post-creation sequence for a task created via ANY
-// path (HTTP createTask 或 orchestration spawn_task),避免两处复制粘贴:
-//  1. seed 根资产,喂给事件驱动 loop;
-//  2. 可选种子意图,worker 免等首轮 planner 直接开跑;
-//  3. 后台异步做目标分解(发「第 0 轮目标拆解」round + LLM 分解步骤 + 逐条 goal,页面可见),
-//     分解完再 engine.Run —— 引擎在 goal 节点就绪后才启动,避免 planner 抢在 goal 之前跑的竞态。
+// path (HTTP createTask or orchestration spawn_task) to avoid duplicate code:
+//  1. Seed root assets for the event-driven loop.
+//  2. Optionally seed an intent so workers can start without waiting for the first planner round.
+//  3. Decompose goals asynchronously in the background (emit a "Round 0 goal
+//     decomposition" round, LLM decomposition steps, and each goal visibly on the
+//     page), then call engine.Run. Start the engine only after goal nodes are ready
+//     to avoid a race where the planner runs before goals exist.
 //
-// 异步(goroutine)所以调用方立即返回,两条路径行为一致:秒建任务、后台拆目标。
+// This runs asynchronously (goroutine), so callers return immediately. Both paths
+// behave consistently: create the task promptly and decompose goals in the background.
 func (s *Server) launchTask(t *Task, seedText string, seedFirstIntent bool) {
 	if !s.engine.beginTaskOperation(t.ID) {
 		return
@@ -346,12 +349,15 @@ func (s *Server) reconcileConcurrency() {
 	}
 }
 
-// reviveTask 让一个已停下的任务重新跑起来:把终态(done/failed/timeout)拉回 running、
-// 解除暂停,并(重)启动引擎循环 + 唤醒。已在 running 且未暂停的任务:只剩 Run 里的一次
-// Notify,近乎无副作用。用于「主 agent set_goals 新增目标」和「重跑 blocked 意图」两处。
+// reviveTask restarts a stopped task: move terminal states (done/failed/timeout)
+// back to running, unpause, and start/restart the engine loop and wake it. For a
+// running, unpaused task, this only adds one Notify in Run and is nearly a no-op.
+// Used after adding a goal through main-agent set_goals and when rerunning blocked intents.
 //
-// 为什么必须显式复活:planner/worker 循环的终态门(engine.go)会吞掉普通 notify——光改
-// 图 + Notify 唤不醒已判完成的任务;重启后终态任务的 goroutine 也可能已不在,故还要 Run。
+// Explicit revival is necessary because the planner/worker terminal-state gate
+// (engine.go) discards ordinary notifications. Updating the graph and notifying
+// cannot wake a completed task, and its goroutine may no longer exist after restart,
+// so Run must also be called.
 func (s *Server) reviveTask(t *Task) {
 	if t == nil {
 		return

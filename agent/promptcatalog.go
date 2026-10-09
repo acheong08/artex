@@ -1,11 +1,13 @@
 package agent
 
-// 本文件把内置 agent 的「默认提示词正文」(段 [A]) 变成可枚举、可被服务端幂等
-// 播种进 agent_prompts 表的目录 —— 镜像 toolcatalog.go 的 BuiltinToolSeeds()。
+// This file makes built-in agents' default prompt bodies (section [A]) enumerable
+// and idempotently seedable by the server into agent_prompts, mirroring
+// BuiltinToolSeeds() in toolcatalog.go.
 //
-// 只包含【可编辑正文】：段 [B] trafficTool 与段 [C] 中间产物输出规约 是代码固定
-// 注入(见 worker.go 的 workerTrafficBlock/artifactSpec)，不入库、不可编辑，因此
-// 不在种子里。种子文本用 Go 模板占位({{.Goal}} 等)，渲染时按运行期变量填充。
+// Only editable bodies are included. Section [B] trafficTool and section [C]
+// intermediate artifact specification are injected by code (see workerTrafficBlock/
+// artifactSpec in worker.go), are not stored or editable, and are therefore not
+// seeded. Seed text uses Go template placeholders ({{.Goal}}, etc.), filled at runtime.
 
 // autoDefaultTmpl is the built-in "Auto" platform-operator agent's prompt. Auto
 // runs via the chat page and drives the platform through tools: task ops
@@ -24,7 +26,7 @@ Principles:
 - Briefly explain in plain language what you did and the result. Use only actual tool responses; do not invent information.
 - Operate only within the authorized scope.`
 
-// pentestDefaultTmpl is the built-in "渗透测试" (solo pentest) agent's prompt. Unlike
+// pentestDefaultTmpl is the built-in "penetration testing" (solo pentest) agent's prompt. Unlike
 // the orchestration roles (goals/planner/worker), it runs standalone via the chat page
 // and is its own planner + executor + auditor. Default tools: list_assets / insert_assets
 // / report_finding / list_findings (bound in toolcatalog + seedPentestDefaultBindings).
@@ -69,7 +71,7 @@ Be practical, measured, and thorough. It is better to thoroughly pursue and veri
 // render fallback in RunChat when the DB prompt is somehow missing.
 const DefaultAssistantPrompt = `You are a helpful AI assistant. Answer the user's questions concisely and accurately in English; use available tools to complete tasks when needed. Do only what the user asks, and do not invent information.`
 
-// ReporterDefaultPrompt is the seeded prompt for the "报告撰写"(reporter) custom
+// ReporterDefaultPrompt is the seeded prompt for the "report writing" (reporter) custom
 // agent — triggered when report_finding fires. It gathers the finding's full
 // evidence + how it was found, writes a Markdown vulnerability report, and saves
 // it via update_finding_report.

@@ -11,7 +11,7 @@ import (
 )
 
 // =====================================================================
-// 公司主体层
+// Company entity layer
 // =====================================================================
 
 // Company is a row in the companies table.
@@ -52,8 +52,9 @@ var (
 )
 
 const (
-	// 企业范围不限制规则条数:逐个 IP / 域名录入的范围动辄上千条,封顶只会逼用户
-	// 拆成多个企业。请求体大小(server 侧 maxCompanyMutationBodyBytes)仍然兜底。
+	// Company scope has no rule-count limit: individually entered IPs/domains can easily number
+	// in the thousands, and a cap would force users to split one company into several. The request
+	// body size is still limited by server-side maxCompanyMutationBodyBytes.
 	//
 	// Raw and normalized textual scope payloads are bounded by Unicode rune
 	// count so multi-byte input is treated consistently by the API and DB layer.
@@ -69,7 +70,7 @@ func (e *CompanyScopeValidationError) Error() string { return e.Message }
 
 // ValidateCompanyScopeInputBounds applies request-wide limits before parsing.
 // Store methods call it again so non-HTTP callers cannot bypass the limits.
-// 只约束单条规则的长度,不限制条数。
+// Limit the length of each rule, but not the number of rules.
 func ValidateCompanyScopeInputBounds(inputs []ScopeInput) error {
 	for i, input := range inputs {
 		if utf8.RuneCountInString(input.Value) > MaxCompanyScopeRawRunes {
@@ -633,7 +634,7 @@ LIMIT $1`, malformedIPAssetsSampled)
 	}
 	warning := fmt.Sprintf(
 		"%d assets have an invalid IP in the ip field; IP/CIDR scope matching was skipped (these assets will not be attributed to a company by network rules): %s",
-		total, strings.Join(samples, "、"),
+		total, strings.Join(samples, ", "),
 	)
 	if total > len(samples) {
 		warning += fmt.Sprintf(" and %d more", total)

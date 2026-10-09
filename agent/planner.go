@@ -148,22 +148,22 @@ func renderPlannerTodos(items []actool.Todo) string {
 // overview. Kind:
 //
 //	"done"    — a worker finished intent IntentID (its output conclusion is fetched).
-//	"finding" — a worker reported a finding on intent IntentID (Detail = 摘要).
-//	"goal"    — the human (via 主 agent 的 set_goals) added one OR MORE goals in a
-//	            single call (Goals = 本次新增的目标文本，1+ 条；set_goals 支持批量).
-//	"goal_deleted" — the human deleted a goal from 总览的目标管理 (Detail = 被删目标文本).
-//	"goal_edited"  — the human edited a goal from 总览的目标管理 (OldGoal→NewGoal 文本).
-//	"cancelled" — the human deleted intent IntentID (Detail = 删除原因). The intent is
+//	"finding" — a worker reported a finding on intent IntentID (Detail = summary).
+//	"goal"    — the human (through the main agent's set_goals) added one or more goals
+//	            in a single call (Goals = 1+ newly added goal texts; set_goals supports batches).
+//	"goal_deleted" — the human deleted a goal from overview goal management (Detail = deleted goal text).
+//	"goal_edited"  — the human edited a goal in overview goal management (OldGoal→NewGoal text).
+//	"cancelled" — the human deleted intent IntentID (Detail = deletion reason). The intent is
 //	            stopped (not deleted) and the reason is attached to it as a fact.
 type TriggerEvent struct {
 	Kind     string
 	IntentID int64
 	Detail   string
-	Summary  string   // Kind=="cancelled" 专用：删除前捕获的意图摘要（真删除后节点已不存在，无法再查）
-	Goals    []string // Kind=="goal" 专用：本次 set_goals 新增的目标文本（1 条或多条）
-	OldGoal  string   // Kind=="goal_edited" 专用：修改前的目标文本
-	NewGoal  string   // Kind=="goal_edited" 专用：修改后的目标文本
-	Hints    []string // Kind=="hint" 专用：本次 add_hint 新增的提示文本（1 条或多条）
+	Summary  string   // For "cancelled": intent summary captured before deletion (the node is gone afterward).
+	Goals    []string // For "goal": one or more goal texts added by this set_goals call.
+	OldGoal  string   // For "goal_edited": goal text before editing.
+	NewGoal  string   // For "goal_edited": goal text after editing.
+	Hints    []string // For "hint": one or more hint texts added by this add_hint call.
 }
 
 // renderTriggers spells out the change(s) that fired this round: for a finished
@@ -197,7 +197,7 @@ func renderTriggers(ts *db.ExplorationStore, evs []TriggerEvent) string {
 		case "finding":
 			b.WriteString(fmt.Sprintf("\n- The worker for intent #%d (%s) reported a finding: %s", ev.IntentID, intentSummary(ts, ev.IntentID), ev.Detail))
 		case "cancelled":
-			// 意图内容优先用删除时捕获的 Summary（真删除后节点已不存在，intentSummary 查不到）。
+			// Prefer the summary captured at deletion; intentSummary cannot find a deleted node.
 			sm := ev.Summary
 			if sm == "" {
 				sm = intentSummary(ts, ev.IntentID)
@@ -214,7 +214,7 @@ func renderTriggers(ts *db.ExplorationStore, evs []TriggerEvent) string {
 	return b.String()
 }
 
-// factIDsYielded lists the fact ids an intent produced this run as "#12、#15", so the
+// factIDsYielded lists the fact IDs an intent produced this run as "#12, #15", so the
 // planner can jump straight to the round's incremental facts. Empty (best-effort) when
 // the intent yielded no facts or the lookup fails.
 func factIDsYielded(ts *db.ExplorationStore, id int64) string {
@@ -226,7 +226,7 @@ func factIDsYielded(ts *db.ExplorationStore, id int64) string {
 	for i, fid := range ids {
 		parts[i] = fmt.Sprintf("#%d", fid)
 	}
-	return strings.Join(parts, "、")
+	return strings.Join(parts, ", ")
 }
 
 // intentSummary reads an intent node's one-line summary (best-effort, "?" on miss).
@@ -292,8 +292,8 @@ func renderGraphOverview(data map[string]any) string {
 	return "\n\n[Current situation (prefetched from graph_overview; equivalent to calling that tool. Use node_detail/list_facts, etc. as needed for details)]:\n" + string(b)
 }
 
-// plannerDefaultTmpl is the built-in EDITABLE body (段 [A]) of the planner prompt,
-// seeded into agent_prompts. Goal is a {{.Goal}} template var; the 中间产物输出规约
+// plannerDefaultTmpl is the built-in EDITABLE body (section [A]) of the planner prompt,
+// seeded into agent_prompts. Goal is a {{.Goal}} template var; the intermediate artifact specification
 // tail is code-owned (artifactSpec) and appended by plannerSystem after rendering.
 const plannerDefaultTmpl = `You are the "planner" in an authorized penetration testing system. You are woken frequently (whenever the graph changes). Your job is to review the situation → assess goals → add exploration intents **only when there are genuinely new, uncovered directions**. You are the planner, not the executor: this round's only outputs are to **create/clarify intents** or **assess goals**; never perform the work in the plan.
 
@@ -370,33 +370,36 @@ func (p *Planner) Plan(ctx context.Context, taskID int64, as *db.AssetStore, ts 
 	if origin, _ := ts.OriginFactID(); origin > 0 {
 		tsx.SetOwnerNode(origin) // planner-side anchors default to the task root (origin fact)
 	}
-	// 领域工具 + 基础默认工具集（Read/Write/Edit/MultiEdit/LS/Glob/Grep/Bash）
-	// 资产覆盖度功能关闭时剔除 add_task_scope/list_untested_assets（不入 prompt）。
+	// Domain tools plus default tools (Read/Write/Edit/MultiEdit/LS/Glob/Grep/Bash).
+	// Omit add_task_scope/list_untested_assets from the prompt when asset coverage is disabled.
 	base := append(tsx.DropCoverageTools(tsx.PlannerTools()), actool.DefaultTools()...)
 	ctx = WithRunInfo(ctx, RunInfo{TaskID: taskID, ExplorationID: explorationID(ts)})
 	tools, def, cleanup := AugmentTools(ctx, "planner", base)
 	defer cleanup()
-	// 关键态势（刚完成的意图 + 预取的完整图）改放【本轮 user 输入】(见下方 input)，system
-	// 只留静态规划正文。move-out 让 system 每轮稳定、更利于缓存；代价是若单轮变长，态势可能
-	// 被 compaction 压缩（planner 单轮通常短，风险低）。situational 会拼进下方 input。
+	// Put key situation (just-completed intents + prefetched full graph) in this
+	// round's user input (see below), leaving only static planning instructions in
+	// system. This keeps system stable for caching, but compaction may compress the
+	// situation if a round grows long (planner rounds are usually short). situational
+	// is appended to the input below.
 	situational := renderTriggers(ts, triggers) + renderGraphOverview(tsx.graphOverviewData())
-	// 任务级 deadline / 终局模式(经 ctx 注入,见 taskclock.go)。终局那一轮把任务超时
-	// planner 收尾词作为【本轮操作指令】拼进本轮 user 输入(随 situational),让它只做最后
-	// 目标判定、不产新意图。
+	// Task deadline/final mode is injected through ctx (see taskclock.go). In the
+	// final round, append the task-timeout planner prompt as an instruction in this
+	// round's user input (with situational), so it only assesses goals and creates no intents.
 	tc := taskClockFrom(ctx)
 	if tc.Final {
 		situational += "\n\n[Task-timeout wrap-up (special instruction for this round; overrides the regular planning procedure above)]: " + resolveTaskTimeoutWrapup("planner")
 	}
-	// 本任务的工作目录 <workDir>/tasks/<taskID>，先建好。
+	// Create this task's working directory at <workDir>/tasks/<taskID>.
 	taskDir := ensureRunDir(p.workDir, taskID, 0)
 	ctx = intercept.WithReviewContext(ctx, taskDir, intercept.ReviewBackground{})
 	sysBody := plannerSystem(goal, p.workDir, taskDir)
 	if p.wantConstraints() {
-		sysBody += constraintBlock(ts) // 操作约束(若有)注入系统提示,框定探索边界
+		sysBody += constraintBlock(ts) // Inject any operational constraints into the system prompt to bound exploration.
 	}
 	system, boundary := deferredSystem(sysBody, def)
-	// planner 无自身墙钟预算;有 deadline 时把 MaxDuration 夹逼到剩余,让在跑的规划轮在
-	// 任务到点时进收尾(因超时→任务超时词,因步数→per-run 词)。
+	// The planner has no independent wall-clock budget. With a deadline, clamp
+	// MaxDuration to the time remaining so the active round enters wrap-up at the
+	// task deadline (task-timeout prompt for timeout; per-run prompt for turn limit).
 	maxDur, clamped := clampMaxDuration(tc.DeadlineUnix, 0)
 	settle := wrapupSettlement("planner", nil)
 	if tc.DeadlineUnix > 0 {
@@ -410,11 +413,11 @@ func (p *Planner) Plan(ctx context.Context, taskID int64, as *db.AssetStore, ts 
 		DeferredTools:   def.Deferred,
 		UnlockSet:       def.Unlock,
 		PermissionMode:  permission.ModeBypass,
-		EnableWebFetch:  true, // 走记录代理留痕；载入代理 CA 验证 MITM 重签的 HTTPS 证书
+		EnableWebFetch:  true, // Route through the recording proxy; load its CA to verify MITM re-signed HTTPS certificates.
 		WebFetchProxy:   p.proxyAddr,
 		WebFetchCACert:  p.proxyCACert,
-		// 联网搜索(可选)。ddgs 无需 key；brave-free 需 BraveKey；tavily 需 TavilyKey。
-		// WebSearchProxy 是独立出口代理(http/https/socks5)，与记录流量的 MITM 代理无关；空则直连。
+		// Optional web search. ddgs needs no key; brave-free needs BraveKey; tavily needs TavilyKey.
+		// WebSearchProxy is a separate egress proxy (http/https/socks5), unrelated to the traffic-recording MITM proxy; empty means direct.
 		EnableWebSearch:       p.webSearch.Enabled,
 		WebSearchBackend:      p.webSearch.Backend,
 		BraveSearchAPIKey:     p.webSearch.BraveKey,
@@ -423,45 +426,52 @@ func (p *Planner) Plan(ctx context.Context, taskID int64, as *db.AssetStore, ts 
 		DeepSeekSearchAPIKey:  p.webSearch.DeepSeekAPIKey,
 		DeepSeekSearchModel:   p.webSearch.DeepSeekModel,
 		WebSearchProxy:        p.webSearch.Proxy,
-		BashEnv:               proxyEnv(p.proxyAddr, p.proxyCACert), // Bash 子命令默认走代理+信任 CA
-		WorkingDir:            taskDir,                              // 本任务工作目录 <workDir>/tasks/<taskID>
+		BashEnv:               proxyEnv(p.proxyAddr, p.proxyCACert), // Bash subprocesses use the proxy and trust its CA by default.
+		WorkingDir:            taskDir,                              // Task working directory: <workDir>/tasks/<taskID>.
 		ToolOutputDir:         cmdOutDir(taskDir),
 		MaxTurns:              p.maxTurns, // 0 = unlimited (configurable in agent management)
-		MaxDuration:           maxDur,     // 0=不限;有 deadline 时=距 deadline 剩余
+		MaxDuration:           maxDur,     // 0=unlimited; with a deadline, the time remaining.
 		Compaction:            compactionConfig(p.compactionWindow()),
-		// 跨唤醒共享的规划待办：让串行链在多轮之间保留（session 是新的，store 不是）。
+		// Shared planning todo list across wake-ups: preserve serial chains between rounds
+		// (the session is new, but the store is not).
 		Todos: p.todoFor(ts.ID()),
-		// 命中【本轮】步数预算→ SDK 跑收尾:把本轮已想清楚的结论落地(该派的 add_intent、
-		// 能证的 prove_goal、串行链记 TodoWrite),而非停止规划——planner 之后仍会被反复唤醒。
-		// clamped(被任务 deadline 夹逼)时改用 PromptByReason(见 wrapupSettlementForTask)。
+		// When this round reaches its turn budget, SDK wrap-up persists conclusions
+		// reached so far (needed add_intent/prove_goal calls and serial chains in
+		// TodoWrite); it does not stop planning, since the planner will wake again.
+		// When clamped by the task deadline, use PromptByReason (see wrapupSettlementForTask).
 		Settlement:   settle,
-		NonStreaming: p.nonStreaming(), // 该 profile 选非流式时走 Provider.Complete
-		MaxTokens:    p.maxTokens(),    // 0 = 不发上限,由服务端默认值决定
+		NonStreaming: p.nonStreaming(), // Use Provider.Complete when this profile selects non-streaming mode.
+		MaxTokens:    p.maxTokens(),    // 0 = omit the limit; the server default applies.
 	}
 	if p.tx != nil { // persist raw LLM conversation; one accumulating file per task's planner
 		opts.Transcript = p.tx
 		opts.SessionID = fmt.Sprintf("exp%d-planner", ts.ID())
 	}
-	// 实验功能:开启后由 noa 接管上下文压缩(归档集中在 <workDir>/noa/<SessionID> 下,持久)。
+	// Experimental: when enabled, noa handles context compaction and persists archives under <workDir>/noa/<SessionID>.
 	noaSession := fmt.Sprintf("exp%d-planner", ts.ID())
 	enableNoa(&opts, p.noaEnabledFn, p.workDir, noaSession, noaWarn(noaSession))
-	// 态势（刚完成的意图 + 完整图）现在拼进本轮 user 输入（见下方 input）。user 里还有
-	// 指令 + 跨唤醒待办（todo 是模型自己的规划便签，可再生，放 user 即可）。
-	// 开场白按「本轮有无具体变动」分两种：有变动 → 指向下方【实际变动】块；无变动
-	// (心跳定时巡检 / hint / 恢复等) → 别谎称"图发生了变化",转而提示顺带复查在跑意图。
+	// The situation (completed intents + full graph) is now part of this round's
+	// user input. The user message also contains instructions and the cross-wake todo
+	// list (the model's regenerable planning notes belong in user). Use different
+	// introductions depending on whether the round has a concrete change: point to
+	// the [Actual changes] block when present; otherwise (heartbeat/hint/resume) do
+	// not claim the graph changed and remind the planner to review running intents.
 	lead := "A concrete change just occurred (see [Actual changes that triggered this round] below). Plan the next steps accordingly:"
 	if len(triggers) == 0 {
 		lead = "This wake-up was triggered by a **scheduled check (heartbeat) / no concrete change signal** — the graph may not have changed. Also review running intents: use steer_work to correct those stalled or off course, and kill_work to stop those going in a completely wrong direction; then reassess the goals and decide whether to add directions:"
-		// 心跳/无变动唤醒时,若全图已无任何 open 或 running 意图 → 探索已停摆(没 worker 在跑、
-		// 也没排队方向)。明确告知 planner 并强制其本轮补出新方向,别只复查在跑意图后空转一轮。
+		// On a heartbeat/no-change wake with no open or running intents, exploration
+		// has stalled (no worker is running and no direction is queued). Tell the
+		// planner explicitly and require a new direction instead of wasting a round
+		// only reviewing running intents.
 		if active, err := ts.HasActiveIntent(); err == nil && !active {
 			lead = "This wake-up was triggered by a **scheduled check (heartbeat)**, and there are currently **no open or running intents** — no worker is running and no directions are queued, so exploration has stalled. You **must** produce one or more new intents this round that advance the goals and **do not duplicate** existing graph intents (you may not produce zero intents). First determine from the situation below whether the goals are met; if not, add directions immediately:"
 		}
 	}
 	input := lead + situational + "\n\nBased on the situation above, assess the goals. When a goal is **truly achieved** (the desired result was obtained / the target vulnerability was confirmed), mark it met with prove_goal. **Hard requirement: if the goals are not met and there are no open or running intents (frontier_open=0 and running_intents is empty), you must produce at least one intent that advances the goals this round — there is no running work to wait for and no queued direction, so zero intents would leave the task stalled. You may produce no new intents only when existing open/running intents are making progress or the goals are met.**" +
 		renderPlannerTodos(opts.Todos.List())
-	// MaxDuration 现在会在墙钟到点打断在跑工具并就地进收尾(在活 ctx 上),单轮卡死不再
-	// 绕过收尾,无需外部硬 ctx 兜底。ctx 只承载 pause / kill / shutdown。
+	// MaxDuration now interrupts a running tool at the wall-clock deadline and enters
+	// wrap-up in place (on the live context), so a stuck round cannot bypass wrap-up;
+	// no external hard-timeout context is needed. ctx carries only pause/kill/shutdown.
 	_, _, err = captureRun(ctx, opts, input,
 		func(r db.Activity) {
 			if emit != nil {

@@ -12,18 +12,20 @@ import (
 	"github.com/Autumn-27/artex/db"
 )
 
-// 任务级超时协调器(见 docs/任务级超时与收尾设计.md §4/§8.5)。
-// 绝对墙钟:每个带 timeout 的任务一个定时 goroutine,到点驱动有序收尾时序:
-//   ① settling → ② worker 停领新意图 / ③ planner 丢弃普通 notify
-//   ④ 等在跑 worker drain(受 grace) → ⑤ 终局一轮 planner 判定 → ⑥ 定终态(带守卫)
+// Task-level timeout coordinator (see task timeout and wrap-up design, §4/§8.5).
+// Absolute wall clock: each task with a timeout gets one timer goroutine that
+// drives ordered wrap-up when the deadline arrives:
+//   1. settling → 2. workers stop claiming intents / 3. planner drops ordinary notifications
+//   4. wait for running workers to drain (bounded by grace) → 5. final planner round
+//   6. set terminal status (guarded)
 
 const (
-	settleDrainGrace     = 90 * time.Second // 等在跑 worker 优雅收尾的上限;超过则硬 cancel
-	deadlinePollInterval = 2 * time.Second  // deadline 未盖章/LLM 未就绪时的轮询间隔
-	deadlineMaxSleep     = 30 * time.Second // 单次最长睡眠(便于周期复查终态)
+	settleDrainGrace     = 90 * time.Second // Maximum graceful drain time for running workers; then hard-cancel.
+	deadlinePollInterval = 2 * time.Second  // Poll interval while deadline is unstamped or LLM is not ready.
+	deadlineMaxSleep     = 30 * time.Second // Maximum sleep per poll, allowing periodic terminal-state checks.
 )
 
-// ---------- settling 状态 ----------
+// ---------- Settling state ----------
 
 func (e *Engine) isSettling(taskID string) bool {
 	v, _ := e.settling.Load(taskID)
@@ -37,7 +39,7 @@ func (e *Engine) markSettling(taskID string) bool {
 	return !loaded
 }
 
-// ---------- 在跑计数(worker.Execute + planner.Plan),用于 drain ----------
+// ---------- Active work counters (worker.Execute + planner.Plan), used for draining ----------
 
 func (e *Engine) inflightCounter(taskID string) *int64 {
 	v, _ := e.inflight.LoadOrStore(taskID, new(int64))
@@ -103,7 +105,7 @@ func (e *Engine) stampFirstRun(t *Task) {
 	dl, err := e.m.StampTaskFirstRun(t.ID)
 	if err != nil {
 		log.Printf("[deadline] failed to stamp first_run for task %s: %v", t.ID, err)
-		e.stamped.Delete(t.ID) // 允许下次重试
+		e.stamped.Delete(t.ID) // Allow another attempt.
 		return
 	}
 	if dl > 0 {
@@ -123,7 +125,7 @@ func (e *Engine) clockCtx(base context.Context, t *Task, final bool) context.Con
 	return agent.WithTaskClock(base, agent.TaskClock{DeadlineUnix: dl, Final: final})
 }
 
-// ---------- 协调器 ----------
+// ---------- Coordinator ----------
 
 // startDeadlineCoordinator launches the per-task deadline timer once (idempotent).
 // Called from Run() and from the restart reload path, so non-active timeout tasks
@@ -187,30 +189,32 @@ func (e *Engine) settleTask(ctx context.Context, t *Task) {
 	}
 	log.Printf("[deadline] task %s reached its timeout limit; beginning wrap-up sequence", t.ID)
 
-	// ④ 等在跑 worker/planner drain(在跑 run 因夹逼的 MaxDuration 自行进收尾);
-	// 超过 grace 仍未清空 → 硬 cancel 该任务 exec ctx(settling-aware 分支正确归类)。
+	// 4. Wait for running workers/planner to drain (active runs wrap up when their
+	// bounded MaxDuration expires). If still active after grace, hard-cancel the
+	// task exec context; the settling-aware branch classifies the result correctly.
 	hardStop := time.Now().Add(settleDrainGrace)
 	for e.inflightCount(t.ID) > 0 {
 		if time.Now().After(hardStop) {
 			log.Printf("[deadline] task %s drain timed out (%s); hard-cancelling running work", t.ID, settleDrainGrace)
 			e.cancelExec(t.ID, agent.AbortSettleDrainTimeout)
-			_ = sleepCtx(ctx, 3*time.Second) // 给 worker 分支一点时间落库/归类
+			_ = sleepCtx(ctx, 3*time.Second) // Give workers time to persist/classify their results.
 			break
 		}
 		if sleepCtx(ctx, 500*time.Millisecond) {
-			return // 引擎整体关停
+			return // The engine is shutting down.
 		}
 	}
 
-	// ⑤ 终局一轮 planner(任务超时词,最后目标判定,不产新意图)。
+	// 5. Run a final planner round (task-timeout prompt, final goal assessment, no new intents).
 	met := e.runFinalPlannerRound(ctx, t)
 	if !e.beginTaskOperation(t.ID) {
 		return
 	}
 	defer e.decInflight(t.ID)
 
-	// ⑥ 定终态(带守卫):met → done(completed);否则 timeout。若常规路径已先落 done,
-	// 守卫(SetTaskStatusGuarded)会拒绝覆盖,保留 completed 语义。
+	// 6. Set terminal status with a guard: met → done (completed); otherwise timeout.
+	// If the normal path already set done, SetTaskStatusGuarded rejects the overwrite
+	// and preserves the completed state.
 	status := "timeout"
 	if met {
 		status = "done"
@@ -246,7 +250,8 @@ func (e *Engine) runFinalPlannerRound(ctx context.Context, t *Task) (met bool) {
 		}
 		planner, _ = e.snapshotFor(t)
 	}
-	// 独立 ctx(不挂 execCancel,避免 pause/硬 cancel 打断这最后一轮),带 Final 注入任务超时词。
+	// Use an independent context (not tied to execCancel) so pause/hard-cancel cannot
+	// interrupt this final round; inject the task-timeout prompt with Final.
 	fctx := e.clockCtx(ctx, t, true)
 	if !e.beginTaskOperation(t.ID) {
 		return false

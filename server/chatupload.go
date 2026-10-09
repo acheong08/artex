@@ -26,8 +26,10 @@ type chatAttachment struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Size int64  `json:"size"`
-	// Abs 是落盘的绝对路径(m.dir 已是绝对)。建任务前暂存(scope=staging)时前端要用它把
-	// 提示词写进描述;task/session 走 composeAgentMessage 在后端拼路径,不依赖此字段。
+	// Abs is the absolute on-disk path (m.dir is already absolute). For pre-task
+	// staging (scope=staging), the frontend uses it to put the prompt in the
+	// description; task/session messages use composeAgentMessage to build the path
+	// on the backend and do not depend on this field.
 	Abs string `json:"abs,omitempty"`
 }
 
@@ -41,8 +43,8 @@ type chatAttachment struct {
 //
 //	scope=task    → <workDir>/tasks/<id>/uploads/
 //	scope=session → <workDir>/sessions/<id>/uploads/
-//	scope=staging → <workDir>/drafts/<id>/uploads/   (建任务前暂存:任务尚无 ID,
-//	                文件先落这里,前端按返回的 abs 绝对路径写进任务描述)
+//	scope=staging → <workDir>/drafts/<id>/uploads/ (pre-task staging: task has no ID yet,
+//	                files are stored here and the frontend adds the returned absolute path to the task description)
 func (s *Server) chatUpload(w http.ResponseWriter, r *http.Request) {
 	var sub string
 	taskScoped := false
@@ -135,7 +137,7 @@ func composeAgentMessage(msg string, atts []chatAttachment, baseDir string) stri
 	b.WriteString(msg)
 	b.WriteString("\n\n[User-uploaded attachments] (absolute paths; use Read/Bash if needed):")
 	for _, a := range atts {
-		fmt.Fprintf(&b, "\n- %s（%s）", filepath.Join(baseDir, a.Path), humanBytes(a.Size))
+		fmt.Fprintf(&b, "\n- %s (%s)", filepath.Join(baseDir, a.Path), humanBytes(a.Size))
 	}
 	return b.String()
 }

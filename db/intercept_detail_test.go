@@ -49,7 +49,7 @@ func TestInterceptDetails(t *testing.T) {
 		var wg sync.WaitGroup
 		for range 8 {
 			wg.Go(func() {
-				ok, err := d.ResolveIntercept(id, "allowed", "allow", "人工允许执行")
+				ok, err := d.ResolveIntercept(id, "allowed", "allow", "Manually allowed execution")
 				if err != nil {
 					t.Error(err)
 				}
@@ -90,7 +90,7 @@ func TestInterceptDetails(t *testing.T) {
 	})
 	t.Run("denied output and timeout allow", func(t *testing.T) {
 		id := create(t, &InterceptAudit{RunID: "run", ToolUseID: "call", ExecutionStatus: "not_started"})
-		if _, err := d.ResolveIntercept(id, "denied", "deny", "人工拒绝"); err != nil {
+		if _, err := d.ResolveIntercept(id, "denied", "deny", "Manually rejected"); err != nil {
 			t.Fatal(err)
 		}
 		if err := d.CompleteIntercept(id, "run", "call", "failed", "Blocked by hook", false); err != nil {
@@ -101,7 +101,7 @@ func TestInterceptDetails(t *testing.T) {
 			t.Fatal("denial presented as executed")
 		}
 		id = create(t, &InterceptAudit{RunID: "run2", ToolUseID: "call2", Correlation: "exact", InitialAction: "ask"})
-		if _, err := d.ResolveIntercept(id, "timeout", "allow", "超时允许"); err != nil {
+		if _, err := d.ResolveIntercept(id, "timeout", "allow", "Allowed after timeout"); err != nil {
 			t.Fatal(err)
 		}
 		if err := d.CompleteIntercept(id, "run2", "call2", "succeeded", "ok", false); err != nil {

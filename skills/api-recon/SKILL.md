@@ -212,7 +212,7 @@ grep -rhoaE '(params|data|body|payload)\s*:\s*\{' OUTDIR/js/*.js | head -20
 
 Look for type information in `yup`/`zod`/rules, `Form.Item name=`, or embedded Swagger.
 
-→ `param_candidates.json`：`{ path, fields[], source: "static-callsite", confidence }`
+→ `param_candidates.json`: `{ path, fields[], source: "static-callsite", confidence }`
 
 #### 1b.2 — Binding Layer
 

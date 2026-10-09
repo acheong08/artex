@@ -82,7 +82,7 @@ SELECT kind, id, left(label, 160), left(description, 240) FROM (
  UNION ALL
  (SELECT type, id,
     CASE WHEN type='endpoint' THEN concat_ws(' ',NULLIF(method,''),url)
-         ELSE COALESCE(NULLIF(app_name,''),NULLIF(url,''),NULLIF(domain,''),NULLIF(ip,''),NULLIF(bundle_id,''),'资产 #'||id::text) END,
+         ELSE COALESCE(NULLIF(app_name,''),NULLIF(url,''),NULLIF(domain,''),NULLIF(ip,''),NULLIF(bundle_id,''),'Asset #'||id::text) END,
     concat_ws(' · ',type,NULLIF(page_title,''),NULLIF(service_name,''),NULLIF(bundle_id,''),NULLIF(ip,''),port::text)
   FROM assets WHERE ($1='' OR $1='asset' OR type=$1) AND
     ($2='' OR id::text=$2 OR concat_ws(' ',domain,root_domain,ip,url,app_name,bundle_id,page_title,service_name,method) ILIKE $3)

@@ -129,7 +129,7 @@ func TestLiveContextReview(t *testing.T) {
 					}
 				}
 			}
-			if tc.name == "report_content_is_not_executed" && !strings.Contains(operation, "写") && !strings.Contains(operation, "新建") && !strings.Contains(operation, "创建") {
+			if tc.name == "report_content_is_not_executed" && !strings.Contains(operation, "write") && !strings.Contains(operation, "create") && !strings.Contains(operation, "new") {
 				t.Errorf("report content was mistaken for the current write: %s", operation)
 			}
 		})

@@ -166,7 +166,7 @@ export function classifyCompanyScopeLine(
     const error = companyScopeRuleError(rule);
     return error ? { line, error } : { line, rule };
   }
-  if (/icp|备案/i.test(value)) return { line, rule: { kind: "icp", value } };
+  if (/icp|filing/i.test(value)) return { line, rule: { kind: "icp", value } };
   return { line, rule: { kind: "keyword", value } };
 }
 

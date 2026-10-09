@@ -182,7 +182,7 @@ function toolInputText(tool: string, raw: string): string {
 }
 
 // InterceptCard renders an inline intercept_request approval card. The pending_id
-// is extracted from the summary (format: "工具 X 请求审批 (#N)") so buttons are
+// is extracted from the summary (format: "Tool X approval requested (#N)") so buttons are
 // available immediately without waiting for the detail load.
 function InterceptCard({
   step,
@@ -191,14 +191,14 @@ function InterceptCard({
   step: Activity;
   getDetail: (seq: number) => Promise<string>;
 }) {
-  // extract pending_id from summary: "工具 Bash 请求审批 (#42)"
+  // Extract pending_id from summary: "Tool Bash approval requested (#42)".
   const pendingId = React.useMemo(() => {
     const m = /\(#(\d+)\)/.exec(step.summary);
     return m ? parseInt(m[1], 10) : null;
   }, [step.summary]);
 
   const toolName = React.useMemo(() => {
-    const m = /工具\s+(\S+)\s+请求/.exec(step.summary);
+    const m = /Tool\s+(\S+)\s+approval/i.exec(step.summary);
     return m ? m[1] : step.summary;
   }, [step.summary]);
 
@@ -382,7 +382,7 @@ function ToolBlock({
   const rawCmd =
     use && use.summary.startsWith(toolName) ? use.summary.slice(toolName.length).trimStart() : (use?.summary ?? "");
   const cmd = toolInputText(toolName, rawCmd);
-  // status only — the full result lives behind the expand (【输出】), not previewed inline
+  // Status only — the full result is behind the "Output" expander, not previewed inline.
   const statusText = running ? "Running…" : ok ? "✓" : "✕ Failed";
 
   // key over the seqs we'd load; changes when the result (or command) arrives.
@@ -403,7 +403,7 @@ function ToolBlock({
       if (!live) return;
       setDetail(
         segs
-          .map((x, i) => `【${x.label}】\n${x.label === "命令" ? toolInputText(toolName, parts[i]) : parts[i]}`)
+          .map((x, i) => `[${x.label}]\n${x.label === "Command" ? toolInputText(toolName, parts[i]) : parts[i]}`)
           .join("\n\n"),
       );
       loadedKey.current = detailKey;
@@ -514,7 +514,7 @@ function MessageBlock({
       ),
     ).then((parts) => {
       if (!live) return;
-      setDetail(group.steps.map((s, i) => `【${kindLabel(s.kind)}】\n${parts[i]}`).join("\n\n"));
+      setDetail(group.steps.map((s, i) => `[${kindLabel(s.kind)}]\n${parts[i]}`).join("\n\n"));
       loadedKey.current = detailKey;
     });
     return () => {

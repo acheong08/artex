@@ -392,7 +392,7 @@ func (s *Server) pgSendConversationMessage(w http.ResponseWriter, r *http.Reques
 	}
 	var req struct {
 		Message     string           `json:"message"`
-		Attachments []chatAttachment `json:"attachments,omitempty"` // 方式1 上传的文件(路径相对会话工作目录)
+		Attachments []chatAttachment `json:"attachments,omitempty"` // Method 1: upload files (paths relative to the conversation working directory).
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, err.Error())
@@ -440,7 +440,7 @@ func (s *Server) pgSendConversationMessage(w http.ResponseWriter, r *http.Reques
 	if _, err := pg.AppendConvActivity(c.ID, ua); err != nil {
 		log.Printf("[conv %d] append user msg failed: %v", c.ID, err)
 	}
-	if c.Title == "" || c.Title == "New conversation" || c.Title == "新对话" {
+	if c.Title == "" || c.Title == "New conversation" {
 		title := firstLine(msg, 40)
 		if title == "" {
 			title = "Attachment message"
@@ -558,7 +558,7 @@ func (s *Server) runConversationTurn(ctx context.Context, cancel context.CancelC
 			log.Printf("[conv %d] append activity failed: %v", c.ID, err)
 		}
 	}
-	// On a manual stop ctx is cancelled; Chat already emits a clean "已手动停止"
+	// On a manual stop ctx is cancelled; Chat already emits a clean "Stopped by user"
 	// step, so skip the raw-error entry — only surface genuine failures.
 	if _, err := ca.Chat(ctx, c.AgentKey, sessionID, msg, maxTurns, maxDuration, webSearch, emit); err != nil {
 		finishReason = err.Error()
@@ -572,16 +572,16 @@ func (s *Server) runConversationTurn(ctx context.Context, cancel context.CancelC
 	_ = pg.TouchConversation(c.ID)
 }
 
-// triggerBehavior is an agent's cached P3 trigger post-processing策略 (see the
+// triggerBehavior is an agent's cached P3 trigger post-processing policy (see the
 // agents table trigger_* columns). Read once per fire in StartTriggeredRun so the
 // pump never touches the DB while holding queueMu.
 type triggerBehavior struct {
 	runMode     string // serial | parallel
-	mergeMode   string // by_task | all | none (serial 用;parallel 忽略,每条各自一个会话)
-	maxParallel int    // parallel 用的每 agent 并发上限;<=0=不限
+	mergeMode   string // by_task | all | none (serial only; ignored for parallel, each gets its own conversation).
+	maxParallel int    // Per-agent concurrency limit for parallel mode; <=0 = unlimited.
 }
 
-// readTriggerBehavior loads an agent's策略, falling back to safe defaults
+// readTriggerBehavior loads an agent's policy, falling back to safe defaults
 // (serial / all / 5) on any error or unknown enum value.
 func (s *Server) readTriggerBehavior(agentKey string) triggerBehavior {
 	b := triggerBehavior{runMode: "serial", mergeMode: "all", maxParallel: 5}
@@ -604,7 +604,7 @@ func (s *Server) readTriggerBehavior(agentKey string) triggerBehavior {
 }
 
 // StartTriggeredRun enqueues a P3 trigger fire for agentKey and pumps the queue. The
-// agent's策略 decides concurrency + merge: serial → run one at a time (optionally
+// agent's policy decides concurrency + merge: serial → run one at a time (optionally
 // merging by task / all / none); parallel → run each fire in its own concurrent
 // conversation up to trigger_max_parallel. Distinct agents always run concurrently.
 func (s *Server) StartTriggeredRun(agentKey, title, message string, taskID int64, mergeable bool, taskDesc, taskGoal string) {
