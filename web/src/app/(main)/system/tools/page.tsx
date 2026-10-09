@@ -805,7 +805,7 @@ function CustomToolDialog({
             <div className="grid gap-1.5 rounded-md border p-3">
               <Label className="text-xs font-medium">Test run (uses the current form without saving)</Label>
               <Textarea className="font-mono text-xs" rows={2} value={paramsText}
-                placeholder={'示例参数 JSON，如 {"target":"example.com"}'}
+                placeholder={'Example parameter JSON, e.g. {"target":"example.com"}'}
                 onChange={(e) => setParamsText(e.target.value)} />
               <div>
                 <Button size="sm" variant="outline" onClick={runTest} disabled={testing}>

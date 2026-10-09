@@ -532,7 +532,7 @@ func (t *ToolSet) graphOverviewData() map[string]any {
 					m["note"] = "coverage is a rough, informational estimate of asset test coverage, including endpoints and other related assets. It includes the current task's and directly related tasks' scopes and fact anchors; related scopes are read-only. Container assets or extensive enumeration may make it appear low, so do not assume testing is complete based on this metric. Use add_task_scope to expand this task's scope or list_untested_assets to view untested assets (usually do not call list_untested_assets; proceed with the task)."
 					if cov.Denominator == 0 {
 						m["pct"] = nil
-						m["status"] = "范围未锚定"
+						m["status"] = "Scope not anchored"
 					} else {
 						m["pct"] = cov.Pct
 					}
@@ -899,7 +899,7 @@ func compactFinding(n *db.Node) map[string]any {
 }
 
 func (t *ToolSet) listFindings() actool.CoreTool {
-	return t.readExpTool("list_findings", "列本任务及直接关联任务的【确认漏洞】(紧凑：id+task_id+intent_id+vulnclass+severity+摘要+状态)。关联任务条目带 source_task_id/inherited=true 且只读。这里只含漏洞；普通探索事实用 list_facts，详情用 node_detail(id)。",
+	return t.readExpTool("list_findings", "List **confirmed findings** in this task and directly related tasks (compact fields: id+task_id+intent_id+vulnclass+severity+summary+status). Entries from related tasks include source_task_id/inherited=true and are read-only. Findings only; use list_facts for ordinary exploration facts and node_detail(id) for details.",
 		obj(map[string]any{}),
 		func(context.Context, json.RawMessage) (actool.Result, error) {
 			f, _ := t.ts.ListByKindWithSources(db.KindFinding, 500)
@@ -937,11 +937,11 @@ func (t *ToolSet) listFindings() actool.CoreTool {
 const factsPageSize = 20
 
 func (t *ToolSet) listFacts() actool.CoreTool {
-	return t.readExpTool("list_facts", "分页列本任务及直接关联任务的【探索事实/结论】，最新在前(紧凑：id+摘要+状态，摘要过长会截断，全文用 node_detail(id))。参数均可选：limit(默认 20，上限 100)、before(游标，传上一页返回的 next_before 取更旧的一页；省略/0=最新一页)、q(按摘要关键词过滤)。返回 {facts, total, has_more, next_before}：total 是过滤后的总数，has_more=true 时用 next_before 继续翻页。关联任务条目带 source_task_id/inherited=true 且只读。漏洞看 list_findings。",
+	return t.readExpTool("list_facts", "Paginate through **exploration facts/conclusions** in this task and directly related tasks, newest first (compact fields: id+summary+status; long summaries are truncated; use node_detail(id) for full text). All parameters are optional: limit (default 20, max 100), before (cursor; pass the previous page's next_before to get older entries; omit/0 for the newest page), q (filter by summary keyword). Returns {facts, total, has_more, next_before}: total is the filtered count; when has_more=true, use next_before to continue. Entries from related tasks include source_task_id/inherited=true and are read-only. Use list_findings for vulnerabilities.",
 		obj(map[string]any{
-			"limit":  intp("返回条数，默认 20，上限 100"),
-			"before": intp("分页游标：只返回 id 小于该值的更旧事实；省略或 0 = 最新一页"),
-			"q":      str("按事实摘要关键词过滤（不区分大小写）；省略 = 不过滤"),
+			"limit":  intp("Number of entries to return; default 20, maximum 100"),
+			"before": intp("Pagination cursor: return only older facts with IDs below this value; omit or use 0 for the newest page"),
+			"q":      str("Filter by a keyword in the fact summary (case-insensitive); omit to disable filtering"),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {
@@ -990,8 +990,8 @@ func compactFact(n *db.Node) map[string]any {
 }
 
 func (t *ToolSet) nodeDetail() actool.CoreTool {
-	return t.readExpTool("node_detail", "按 id 取本任务或直接关联任务的【探索图节点】完整内容。继承节点带 source_task_id/inherited=true 且只读。仅限 list_facts/list_findings/graph_overview 返回的探索节点 id；资产请用 list_assets/asset_neighbors。",
-		obj(map[string]any{"id": idp("探索图节点 id(非资产 id)")}, "id"),
+	return t.readExpTool("node_detail", "Get the full contents of an **exploration graph node** in this task or a directly related task by ID. Inherited nodes include source_task_id/inherited=true and are read-only. Use only exploration-node IDs returned by list_facts/list_findings/graph_overview; use list_assets/asset_neighbors for assets.",
+		obj(map[string]any{"id": idp("Exploration graph node ID (not an asset ID)")}, "id"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {
 				ID json.RawMessage `json:"id"`
@@ -999,14 +999,14 @@ func (t *ToolSet) nodeDetail() actool.CoreTool {
 			_ = json.Unmarshal(in, &a)
 			id := pid(a.ID)
 			if id <= 0 {
-				return actool.Errorf("id 必填"), nil
+				return actool.Errorf("id is required"), nil
 			}
 			n, err := t.ts.GetNodeWithSources(id)
 			if err != nil {
 				return actool.Errorf(err.Error()), nil
 			}
 			if n == nil {
-				return actool.Errorf(fmt.Sprintf("未找到探索节点 %d。若你想查的是资产，请用 list_assets / asset_neighbors（资产与探索节点是不同的 id 空间，资产 id 不能传给 node_detail）。", id)), nil
+				return actool.Errorf(fmt.Sprintf("Exploration node %d not found. If you meant an asset, use list_assets / asset_neighbors (asset IDs and exploration node IDs are separate; do not pass an asset ID to node_detail).", id)), nil
 			}
 			if err := t.ts.PopulateFindingTrafficIDs([]*db.Node{n}); err != nil {
 				return actool.Errorf(err.Error()), nil
@@ -1316,7 +1316,7 @@ type factItem struct {
 // 批量时的默认意图（本条未给 intent_id 时用）。
 func (t *ToolSet) recordOneFact(it factItem, defaultIntent int64) (int64, error) {
 	if strings.TrimSpace(it.Summary) == "" {
-		return 0, fmt.Errorf("summary 不能为空")
+		return 0, fmt.Errorf("summary cannot be empty")
 	}
 	payload := map[string]any{"summary": it.Summary}
 	if it.Detail != "" {
@@ -1351,21 +1351,21 @@ func (t *ToolSet) recordOneFact(it factItem, defaultIntent int64) (int64, error)
 }
 
 func (t *ToolSet) recordFact() actool.CoreTool {
-	return t.writeExpTool("record_fact", "把探索【事实/结论】写入探索图，连到产生它的意图（intent_id）。用于记录探索结果——包括指纹/枚举等【正向结论】，和'端口关闭'/'参数不可注入'/'未发现登录入口'等【否定结论】。\n"+
-		"⚠️一次探索的多个观察要【汇总成一条事实】，不要拆成多条，可以合并成一条事实的就尽量用一条事实表示：summary=对本次结论的总结性一句话，detail=相关细节（可含多个具体项）。例：指纹意图→一条事实 {summary:'识别了 X 站点的技术栈与响应特征', detail:'nginx 1.25 / Vue3 / 200 / title=.. / body_len=..'}，而不是状态码、指纹、标题各记一条。一条意图通常只产出一条事实，拆太碎会让图谱无限膨胀。\n"+
-		"★facts 数组用于一次写多条【彼此不同】的结论（每条可省略 intent_id，默认用顶层 intent_id）。返回 ids 数组，与 facts 等长同序。\n"+
-		"⚠️只写你在工具输出里【真实看到】的结论，不要脑补。evidence 与 confidence 用来防止不准确的结论污染图谱：\n"+
-		"  · evidence=支撑本结论的【一行】关键证据（命令+最能证明的那一两行输出），**务必简洁**——细节已在 detail，这里不要再粘大段输出。\n"+
-		"  · confidence=observed（输出里直接看到）| inferred（据现象推断）。\n"+
-		"  · **否定类结论**（不可注入/端口关闭/未发现入口等）只写\"观察 + 试探性读法\"——陈述你实际看到什么，方向是否放弃由规划者综合全局定；务必给 evidence，手段没穷尽或证据弱（含只探一次、看起来像）标 inferred，确已穷尽且直接看到才标 observed。",
+	return t.writeExpTool("record_fact", "Record an exploration **fact/conclusion** in the exploration graph and link it to the intent (intent_id) that produced it. Use this to record exploration results, including positive conclusions such as fingerprints/enumeration and negative conclusions such as 'port is closed,' 'parameter is not injectable,' or 'no login entry point found.'\n"+
+		"⚠️Combine multiple observations from one exploration into **one fact** instead of splitting them into separate facts whenever possible: summary=one sentence summarizing the conclusion; detail=relevant details (may include multiple specific items). Example: one fact for a fingerprinting intent: {summary:'Identified the technology stack and response characteristics of site X', detail:'nginx 1.25 / Vue3 / 200 / title=.. / body_len=..'}, rather than separate facts for status code, fingerprint, and title. An intent typically produces one fact; excessive splitting causes unbounded graph growth.\n"+
+		"★Use the facts array to record multiple **distinct** conclusions in one call (intent_id may be omitted per item; the top-level intent_id is used by default). The returned ids array matches facts in length and order.\n"+
+		"⚠️Record only conclusions you **actually observed** in tool output; do not speculate. evidence and confidence help prevent inaccurate conclusions from polluting the graph:\n"+
+		"  · evidence=【one line】of key evidence supporting the conclusion (command + the one or two most probative output lines). **Keep it concise**—details belong in detail; do not paste lengthy output here.\n"+
+		"  · confidence=observed (directly visible in output) | inferred (inferred from evidence).\n"+
+		"  · For **negative conclusions** (not injectable/port closed/no entry point found, etc.), record only the \"observation + tentative interpretation\": state what you actually observed; the planner decides whether to abandon the direction based on the full context. Always include evidence. Mark inferred if testing was incomplete or evidence is weak (including a single probe or an appearance); use observed only when testing was exhaustive and the result was directly observed.",
 		obj(map[string]any{
-			"facts":      map[string]any{"type": "array", "description": "【有多条不同结论时用】事实数组，元素字段同下方顶层字段（summary/detail/evidence/confidence/intent_id/asset_ids）；省略 intent_id 则用顶层 intent_id。返回 ids 与本数组等长、同序。", "items": map[string]any{"type": "object"}},
-			"summary":    str("对本次探索结论的【总结性一句话】（是对 detail 的概括）"),
-			"intent_id":  idp("产生本事实的意图 id（你领到的意图；批量时作为各条默认）"),
-			"detail":     str("本事实的相关细节：把这次探索的多个观察事实都写进这里"),
-			"evidence":   str("【一行】关键证据：命令 + 最能证明结论的那一两行输出。务必简洁，不要粘大段输出（细节放 detail）。"),
-			"confidence": str("observed（输出里直接看到）| inferred（据现象推断）。否定结论务必如实标注。"),
-			"asset_ids":  map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "相关资产 id（可选，0/1/多个）：该事实涉及哪些资产"},
+			"facts":      map[string]any{"type": "array", "description": "Use when recording multiple distinct conclusions. Each item has the same fields as the top-level fields below (summary/detail/evidence/confidence/intent_id/asset_ids); if intent_id is omitted, the top-level intent_id is used. The returned ids array matches this array in length and order.", "items": map[string]any{"type": "object"}},
+			"summary":    str("One-sentence summary of the exploration conclusion (an overview of detail)"),
+			"intent_id":  idp("ID of the intent that produced this fact (the intent assigned to you; used as the default for batch items)"),
+			"detail":     str("Relevant details for this fact; include the observations from this exploration"),
+			"evidence":   str("【One line】Key evidence: command + the one or two most probative output lines. Keep it concise; put details in detail."),
+			"confidence": str("observed (directly visible in output) | inferred (inferred from evidence). Label negative conclusions accurately."),
+			"asset_ids":  map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "Optional related asset IDs (zero, one, or more): assets involved in this fact"},
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {
@@ -1549,14 +1549,14 @@ type constraintItem struct {
 func (t *ToolSet) addOneConstraint(it constraintItem) (int64, error) {
 	text := strings.TrimSpace(it.Text)
 	if text == "" {
-		return 0, fmt.Errorf("text 不能为空")
+		return 0, fmt.Errorf("text cannot be empty")
 	}
 	kind := strings.TrimSpace(strings.ToLower(it.Type))
 	if kind == "" {
 		kind = "deny" // 默认按禁止处理:未标注类型时更保守
 	}
 	if kind != "allow" && kind != "deny" {
-		return 0, fmt.Errorf("type 必须是 allow 或 deny")
+		return 0, fmt.Errorf("type must be allow or deny")
 	}
 	return t.ts.AddConstraint(kind, text, t.worker)
 }
@@ -1820,16 +1820,16 @@ func traceSteps(acts []db.Activity) []map[string]any {
 // few specific steps. Thinking steps are excluded everywhere.
 func (t *ToolSet) getWorkerTrace() actool.CoreTool {
 	return t.readExpTool("get_worker_trace",
-		"查看某条意图(work)的【执行过程】（区别于 get_worker_output 只给最终结论）。三种用法：\n"+
-			"① 只传 intent_id → 返回该 work 每一步的摘要流（summary≤100字，含 step_id；只是动作轮廓，不含完整输出）；\n"+
-			"② intent_id + q → 只返回命中关键字的步骤摘要（在摘要和完整输出里都搜；仍只给 summary，要看内容用③）；\n"+
-			"③ intent_id + step_ids → 返回这些步骤的完整内容(detail)；一次最多取 5 个，超出只返回前 5 个并在 notice/omitted_step_ids 里告知未取的。\n"+
-			"典型流程：先①/②定位可疑步骤的 step_id，再用③取其完整输出。不含思考(thinking)步骤。支持直接关联任务的历史 trace；其结果带 source_task_id/inherited=true 且只读。",
+		"View the **execution trace** for an intent (work), unlike get_worker_output, which returns only the final conclusion. Three modes:\n"+
+			"① Pass only intent_id → return a summary stream for each step in the work (summary≤100 characters, includes step_id; action outline only, without full output).\n"+
+			"② Pass intent_id + q → return summaries only for steps matching the keyword (searches both summaries and full output; to view content, use ③).\n"+
+			"③ Pass intent_id + step_ids → return full details for those steps; at most 5 per call. If more are supplied, only the first 5 are returned and the rest are listed in notice/omitted_step_ids.\n"+
+			"Typical workflow: use ①/② to find a suspicious step_id, then ③ to retrieve its full output. Thinking steps are excluded. Historical traces from directly related tasks are supported; results include source_task_id/inherited=true and are read-only.",
 		obj(map[string]any{
-			"intent_id": idp("意图 id（= work 句柄）"),
-			"q":         str("关键字：只返回摘要/完整输出命中它的步骤（可选；与 step_ids 互斥）"),
-			"step_ids":  map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "要取完整内容的 step_id（来自①/②返回；一次最多取 5 个，多传只返回前 5 个，其余在 omitted_step_ids 里列出）"},
-			"limit":     intp("摘要流/检索的返回上限（可选）"),
+			"intent_id": idp("Intent ID (= work handle)"),
+			"q":         str("Optional keyword: return only steps whose summary/full output matches it (mutually exclusive with step_ids)"),
+			"step_ids":  map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "Step IDs to retrieve in full (from ①/②; at most 5 per call; only the first 5 are returned and the rest are listed in omitted_step_ids)"},
+			"limit":     intp("Optional maximum number of summary/search results"),
 		}, "intent_id"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {
@@ -1841,14 +1841,14 @@ func (t *ToolSet) getWorkerTrace() actool.CoreTool {
 			_ = json.Unmarshal(in, &a)
 			id := pid(a.IntentID)
 			if id <= 0 {
-				return actool.Errorf("intent_id 必填"), nil
+				return actool.Errorf("intent_id is required"), nil
 			}
 			intentNode, nodeErr := t.ts.GetNodeWithSources(id)
 			if nodeErr != nil {
 				return actool.Errorf(nodeErr.Error()), nil
 			}
 			if intentNode == nil || intentNode.Kind != db.KindIntent {
-				return actool.Errorf("intent_id 不属于本任务或其直接关联任务"), nil
+				return actool.Errorf("intent_id does not belong to this task or a directly related task"), nil
 			}
 			// ③ detail drill-down by step ids, thinking excluded by the store.
 			if len(a.StepIDs) > 0 {
@@ -1896,8 +1896,8 @@ func (t *ToolSet) getWorkerTrace() actool.CoreTool {
 					// whether another call is worth it; the notice states the same in prose.
 					result["omitted_step_ids"] = omitted
 					result["notice"] = fmt.Sprintf(
-						"每次最多取 %d 个步骤的完整内容，本次已返回前 %d 个（%v），未取的 %d 个为 %v。"+
-							"若这些内容已足够定位，则无需再取剩余步骤；确需继续时，用这些 step_id 再调一次。",
+						"At most %d steps can be retrieved in full per call. This call returned the first %d (%v); the %d omitted steps are %v."+
+							"If this is enough to identify the issue, there is no need to retrieve the remaining steps. Otherwise, call again with those step_id values.",
 						maxStepIDs, len(ids), ids, len(omitted), omitted)
 				}
 				if intentNode.Inherited {
@@ -1929,12 +1929,12 @@ func (t *ToolSet) getWorkerTrace() actool.CoreTool {
 // summaries (≤100 chars), each tagged with its intent_id for follow-up drill-down.
 func (t *ToolSet) searchAllWorkerTraces() actool.CoreTool {
 	return t.readExpTool("search_all_worker_traces",
-		"【通常不推荐使用，因为系统中已经给了大部分信息了】在【本任务其他 work 的执行过程】里按关键字(q)检索——用于找回某个 worker 见过、却没写进 fact 的东西（某路径/token/报错等）。"+
-			"已自动排除你自己这条意图的步骤（那些本就在你上下文里）。"+
-			"只返回命中步骤的摘要(summary≤100字)，每条带 intent_id；据此再用 get_worker_trace(intent_id, step_ids=[...]) 取完整内容。",
+		"Usually not recommended because most information is already available. Search the execution traces of other work in this task by keyword (q) to recover something a worker saw but did not record as a fact (such as a path/token/error)."+
+			"Steps from your own intent are automatically excluded because they are already in your context."+
+			"Returns only summaries (summary≤100 characters) of matching steps, each with intent_id; use get_worker_trace(intent_id, step_ids=[...]) to retrieve full details.",
 		obj(map[string]any{
-			"q":     str("关键字（在所有 work 步骤的摘要+完整输出里搜）"),
-			"limit": intp("返回上限，默认 100（可选）"),
+			"q":     str("Keyword to search across summaries and full output of all work steps"),
+			"limit": intp("Maximum results (default 100; optional)"),
 		}, "q"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {
@@ -1943,7 +1943,7 @@ func (t *ToolSet) searchAllWorkerTraces() actool.CoreTool {
 			}
 			_ = json.Unmarshal(in, &a)
 			if strings.TrimSpace(a.Q) == "" {
-				return actool.Errorf("q 必填"), nil
+				return actool.Errorf("q is required"), nil
 			}
 			// 排除调用者自身这条意图的步骤（worker 的自有 trace 已在其上下文里）。
 			acts, err := t.ts.ActivityTraceSearchAllWithSources(t.ownerNode, a.Q, a.Limit)
@@ -1978,12 +1978,12 @@ func (t *ToolSet) searchAllWorkerTraces() actool.CoreTool {
 // no process to inspect).
 func (t *ToolSet) listWorkerTraces() actool.CoreTool {
 	return t.readExpTool("list_worker_traces",
-		"【通常不推荐使用，因为系统中已经给了大部分信息了】列出本任务里【已跑过的 work（意图）】索引：intent_id + 一句话方向(summary) + 状态。"+
-			"你(worker)看不到探索图，用它来发现有哪些 work 值得翻看——再用 get_worker_trace(intent_id) 看其步骤、get_worker_trace(intent_id, step_ids=[...]) 取详情。"+
-			"只列已执行的(running/done/exhausted/blocked/stopped)，不含还没跑的 open。注意：你的任务边界仍是你领到的那条意图，看别的 work 只为复用观察/避免重复劳动。",
+		"Usually not recommended because most information is already available. List the index of work (intents) already run in this task: intent_id + one-line direction summary + status."+
+			"Workers cannot see the exploration graph; use this to find work worth reviewing, then use get_worker_trace(intent_id) to view its steps or get_worker_trace(intent_id, step_ids=[...]) for details."+
+			"Only executed states (running/done/exhausted/blocked/stopped) are listed; open work that has not run is excluded. Your task boundary remains the intent assigned to you; inspect other work only to reuse observations and avoid duplication.",
 		obj(map[string]any{
-			"q":     str("按 summary 关键字过滤（可选）"),
-			"limit": intp("返回上限，默认 50（可选）"),
+			"q":     str("Optional filter by summary keyword"),
+			"limit": intp("Maximum results (default 50; optional)"),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct {

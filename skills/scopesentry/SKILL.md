@@ -37,7 +37,7 @@ Cursor → Settings → MCP → Add Server:
 }
 ```
 
-Alternatively, use: `Authorization: Bearer ssk_你的密钥`
+Alternatively, set the `Authorization` request header with your API key.
 
 After configuring, restart MCP or reload Cursor and confirm that tools such as `list_projects` and `list_assets` appear in the tool list.
 
@@ -89,7 +89,7 @@ When the user or context **already specifies a project**, include `filter.projec
   "pageSize": 20,
   "search": "domain=^example.com",
   "filter": {
-    "project": ["<项目ObjectID>"]
+    "project": ["<project-object-id>"]
   }
 }
 ```
@@ -116,12 +116,12 @@ When the user or context **already specifies a project**, include `filter.projec
 
 ```json
 {
-  "name": "example-子域名收集",
+  "name": "example-subdomain-discovery",
   "node": ["node-1"],
-  "template": "<模板ObjectID>",
+  "template": "<template-object-id>",
   "targetSource": "general",
   "target": "example.com\nfoo.com",
-  "project": ["<项目ObjectID>"]
+  "project": ["<project-object-id>"]
 }
 ```
 
@@ -129,12 +129,12 @@ When the user or context **already specifies a project**, include `filter.projec
 
 ```json
 {
-  "name": "example-端口与漏洞",
+  "name": "example-ports-and-vulnerabilities",
   "node": ["node-1"],
-  "template": "<后续模块模板ObjectID>",
+  "template": "<follow-up-module-template-object-id>",
   "targetSource": "subdomain",
-  "search": "task==\"example-子域名收集\"",
-  "project": ["<项目ObjectID>"]
+  "search": "task==\"example-subdomain-discovery\"",
+  "project": ["<project-object-id>"]
 }
 ```
 
@@ -184,8 +184,8 @@ flowchart LR
 ```json
 {
   "asset_type": "subdomain",
-  "search": "task==\"某任务名\"",
-  "filter": {"project": ["<项目ObjectID>"]}
+  "search": "task==\"some-task-name\"",
+  "filter": {"project": ["<project-object-id>"]}
 }
 ```
 
@@ -309,7 +309,7 @@ JSON object: multiple values for the same key are **OR**; different keys are **A
 **`filter` example:**
 
 ```json
-{"project": ["<项目ObjectID>"], "port": ["443"]}
+{"project": ["<project-object-id>"], "port": ["443"]}
 ```
 
 **Combined query example:**
@@ -318,7 +318,7 @@ JSON object: multiple values for the same key are **OR**; different keys are **A
 {
   "asset_type": "asset",
   "search": "domain=^baidu && port==443",
-  "filter": {"project": ["<项目ObjectID>"]},
+  "filter": {"project": ["<project-object-id>"]},
   "pageIndex": 1,
   "pageSize": 10
 }

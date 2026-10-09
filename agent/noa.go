@@ -39,7 +39,7 @@ func enableNoa(opts *agentcore.Options, enabled func() bool, archiveRoot, sessio
 		OnWarn:         onWarn,
 	}); err != nil {
 		if onWarn != nil {
-			onWarn("noa 压缩启用失败,回退内置压缩:" + err.Error())
+			onWarn("Failed to enable noa compaction; falling back to built-in compaction: " + err.Error())
 		}
 		return
 	}

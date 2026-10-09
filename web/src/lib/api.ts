@@ -165,25 +165,25 @@ export async function http<T>(path: string, init?: RequestInit): Promise<T> {
 // Token is appended as ?token= because SSE can't carry cookies cross-origin.
 // mockReport returns a canned Markdown report for the demo.
 function mockReport(_task?: string): string {
-  return `# ARTEX 渗透测试报告 — Acme Corp
+  return `# ARTEX Penetration Test Report — Acme Corp
 
-## 概览
-- 范围：acme.com（含 www / admin / api / shop / vpn 子域）
-- 已确认发现：6 项（高危 3 · 中危 3 · 低危 2）
-- 引擎模式：exploring
+## Overview
+- Scope: acme.com (including www / admin / api / shop / vpn subdomains)
+- Confirmed findings: 6 (3 high · 3 medium · 2 low)
+- Engine mode: exploring
 
-## 关键发现
-1. **[高] 后台默认口令** admin.acme.com admin/admin123 → 可完全接管后台。
-2. **[高] SQL 注入** www.acme.com/search?q= → 可读取 acme_prod 库。
-3. **[高] IDOR** api.acme.com/v1/orders?id= → 可越权读取他人订单（含手机号/地址）。
-4. **[中] 反射型 XSS**、**暴露 .git 源码**、**登录无速率限制**。
+## Key Findings
+1. **[High] Default admin credentials** admin.acme.com admin/admin123 → full admin portal takeover.
+2. **[High] SQL injection** www.acme.com/search?q= → access to the acme_prod database.
+3. **[High] IDOR** api.acme.com/v1/orders?id= → unauthorized access to other users' orders (including phone numbers and addresses).
+4. **[Medium] Reflected XSS**, **exposed .git source code**, and **no login rate limiting**.
 
-## 建议
-- 后台强制改密 + 启用 MFA、封禁默认口令。
-- search 接口参数化查询、输出编码。
-- API 增加对象级授权校验（IDOR）、更换强 JWT 密钥。
+## Recommendations
+- Force an admin password reset, enable MFA, and prohibit default passwords.
+- Use parameterized queries and output encoding in the search endpoint.
+- Add object-level authorization checks to the API (IDOR) and replace weak JWT secrets.
 
-> （demo）本报告由 mock 数据生成，仅用于界面演示。`;
+> (Demo) This report uses mock data for interface demonstration only.`;
 }
 
 export function sseUrl(path: string): string {

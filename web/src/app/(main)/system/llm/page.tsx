@@ -52,9 +52,9 @@ const MAX_TOKENS_FIELDS: { value: string; label: string }[] = [
 // 另外两种格式各自定死了字段名，选项对它们无意义，说明文案里直接讲清楚。
 const MAX_TOKENS_FIELD_HINTS: Record<string, string> = {
   openai:
-    "上限发哪个键。max_tokens 是默认，绝大多数兼容网关只认它；OpenAI 官方推理模型（o 系列 / GPT-5）反过来只认 max_completion_tokens，收到 max_tokens 会直接报 unsupported_parameter。",
-  anthropic: "仅 openai 格式可选。Anthropic 的字段名固定为 max_tokens。",
-  "openai-responses": "仅 openai 格式可选。Responses API 的字段名固定为 max_output_tokens。",
+    "Which key to use for the output limit. max_tokens is the default and is accepted by most compatible gateways. OpenAI reasoning models (o-series / GPT-5) only accept max_completion_tokens; sending max_tokens returns unsupported_parameter.",
+  anthropic: "Available only for the OpenAI format. Anthropic always uses max_tokens.",
+  "openai-responses": "Available only for the OpenAI format. The Responses API always uses max_output_tokens.",
 };
 const EFFORT_LEVELS: { value: string; label: string }[] = [
   { value: NONE, label: "Do not send (default)" },
@@ -573,7 +573,7 @@ function ProfileSheet({
               onChange={(e) => setProxy(e.target.value)}
             />
             <p className="text-muted-foreground text-xs">
-              仅 LLM 出站请求走此代理，支持 http/https/socks5，可带账号密码（如
+              Only outbound LLM requests use this proxy. Supports http/https/socks5 and optional credentials (for example,
               socks5://user:pass@host:port，密码含特殊字符需 URL 编码）；留空表示不使用代理（直连）。
             </p>
           </div>

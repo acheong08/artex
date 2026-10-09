@@ -185,7 +185,7 @@ docker image prune -f          # Remove old images (optional)
 Download the new version's zip from [Releases](https://github.com/Autumn-27/ARTEX/releases). Stop the old process, replace `artex` and `skills/` (keep your `config.json` and `data/`), then restart:
 
 ```bash
-cp -r <解压目录>/skills ./ && cp <解压目录>/artex ./
+cp -r <extracted-directory>/skills ./ && cp <extracted-directory>/artex ./
 ./start.sh
 ```
 

@@ -15,8 +15,8 @@ Existing callers remain compatible: `traffic_refs` / `evidence_hint_id` on `repo
 ```json
 {
   "traffic_refs": [
-    {"traffic_id": "真实流量ID", "role": "baseline", "note": "正常账户请求"},
-    {"traffic_id": "另一个真实流量ID", "role": "proof", "note": "复现请求"}
+    {"traffic_id": "real-traffic-id", "role": "baseline", "note": "Normal authenticated request"},
+    {"traffic_id": "another-real-traffic-id", "role": "proof", "note": "Reproduction request"}
   ]
 }
 ```
@@ -45,7 +45,7 @@ Base path: `/api/exploration/findings/{finding_id}/traffic`, using the separate 
 | --- | --- |
 | `GET` | Ordered summaries, evidence version, and report version |
 | `POST` | Append the full `{"traffic_refs":[...]}` batch |
-| `PATCH /{binding_id}` | `{"version":1,"role":"proof","note":"说明"}` |
+| `PATCH /{binding_id}` | `{"version":1,"role":"proof","note":"Description"}` |
 | `DELETE /{binding_id}` | `{"version":1}` |
 | `PUT /order` | `{"version":1,"binding_ids":["2","1"]}`; the list must be complete |
 | `GET /{binding_id}` | Snapshot metadata and bounded body preview |

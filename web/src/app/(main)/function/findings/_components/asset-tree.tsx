@@ -233,8 +233,8 @@ export function AssetTree({
     [isExpanded],
   );
 
-  let emptyHint = "当前筛选下没有关联到资产的发现。";
-  if (loading) emptyHint = "加载中…";
+  let emptyHint = "No findings linked to assets under the current filters.";
+  if (loading) emptyHint = "Loading…";
   else if (searching) emptyHint = "No matching assets.";
 
   const rows: React.ReactNode[] = [];

@@ -273,7 +273,7 @@ func (n *Notifier) send(ctx context.Context, channel notify.Channel, cfg map[str
 		}
 		sent, rest := deliveries[:delivered], deliveries[delivered:]
 		if err := n.pg.MarkDeliveriesSent(ctx, deliveryIDs(sent)); err != nil {
-			log.Printf("[notify] 标记已送达失败 channel=%s ids=%v: %v", channel.Kind(), deliveryIDs(sent), err)
+			log.Printf("[notify] failed to mark deliveries as delivered channel=%s ids=%v: %v", channel.Kind(), deliveryIDs(sent), err)
 		}
 		if len(rest) > 0 {
 			// 本条消息已达渠道长度上限：剩下的立刻回队，由下一个 tick 续发。

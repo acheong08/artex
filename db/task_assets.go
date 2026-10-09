@@ -13,7 +13,7 @@ const (
 	MaxTaskAssetMutationCount = 100
 	MaxTaskAssetSummaryRunes  = 500
 	defaultTaskAssetSource    = "system"
-	manualTaskScopeSummary    = "用户在测试资产页手工新增"
+	manualTaskScopeSummary    = "Manually added by the user on the test assets page"
 )
 
 var (
@@ -145,7 +145,7 @@ func (s *AssetStore) RegisterTaskAssetScopes(taskID int64, inputs []ScopeInput) 
 	for index, input := range inputs {
 		rule, err := ParseScopeInput(input)
 		if err != nil {
-			return mutation, fmt.Errorf("%w: 第 %d 条范围无效: %v", ErrTaskAssetInvalid, index+1, err)
+			return mutation, fmt.Errorf("%w: invalid scope entry %d: %v", ErrTaskAssetInvalid, index+1, err)
 		}
 		parsed = append(parsed, rule)
 	}
@@ -201,7 +201,7 @@ func (s *AssetStore) RegisterTaskAssetScopes(taskID int64, inputs []ScopeInput) 
 			taskScope.Net = rule.Net
 			ip, _, parseErr := net.ParseCIDR(rule.Net)
 			if parseErr != nil {
-				return mutation, fmt.Errorf("%w: 无效 IP: %s", ErrTaskAssetInvalid, rule.Raw)
+				return mutation, fmt.Errorf("%w: invalid IP: %s", ErrTaskAssetInvalid, rule.Raw)
 			}
 			ipValue := ip.String()
 			var alreadyLinked bool

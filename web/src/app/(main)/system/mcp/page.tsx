@@ -312,7 +312,7 @@ export default function MCPPage() {
           <Label htmlFor="m-env">
             {form.transport !== "stdio"
               ? "请求头（每行 KEY=VALUE，如 Authorization=Bearer xxx）"
-              : "环境变量（每行 KEY=VALUE）"}
+              : "Environment variables (one KEY=VALUE pair per line)"}
           </Label>
           <Textarea
             id="m-env"

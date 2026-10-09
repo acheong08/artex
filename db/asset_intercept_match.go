@@ -156,7 +156,7 @@ func (a *Asset) InterceptLabel() string {
 	default:
 		target = fmt.Sprintf("#%d", a.ID)
 	}
-	return fmt.Sprintf("资产#%d[%s] %s", a.ID, a.Type, target)
+	return fmt.Sprintf("Asset #%d[%s] %s", a.ID, a.Type, target)
 }
 
 // hasEnabledRule 判断规则集里是否存在任一启用规则。

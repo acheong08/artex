@@ -1162,7 +1162,7 @@ export default function DashboardPage() {
 
             {activeProfile && (
               <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2">
-                <div className="text-[10px] text-muted-foreground">激活模型</div>
+                <div className="text-[10px] text-muted-foreground">Active model</div>
                 <span className="font-mono text-[10px]">{activeProfile.model}</span>
               </div>
             )}
