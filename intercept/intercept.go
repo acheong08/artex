@@ -477,9 +477,9 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 	configJSON, _ := json.Marshal(cfg)
 	out.ConfigDigest = digestInput(configJSON)
 	if out.Message == "" {
-		out.Message = "[模型] " + judgeActionLabel(out.Action)
-	} else if !strings.HasPrefix(out.Message, "[模型]") {
-		out.Message = "[模型] " + out.Message
+		out.Message = "[Model] " + judgeActionLabel(out.Action)
+	} else if !strings.HasPrefix(out.Message, "[Model]") {
+		out.Message = "[Model] " + out.Message
 	}
 	if out.Action == "ask" {
 		out.TimeoutEnabled = true

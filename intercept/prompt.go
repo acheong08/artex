@@ -33,10 +33,10 @@ const JudgeOutputContract = `# Verdict Output Contract (replaces earlier output-
 Output exactly one JSON object: the first character must be { and the last must be }. Do not output reasoning, a preface, explanation, or a Markdown code fence; no other characters may appear before or after the JSON.
 The object must contain exactly two string fields, decision and comment. Use double quotes for keys and string values. Do not output YAML such as decision: ... / comment: ....
 decision must be allow, ask, or deny.
-comment must use exactly this three-part structure, with all three parts non-empty: "实际操作：...；成功后的后果：...；命中规则：...". Write one concise sentence per part and keep the entire comment to no more than 120 characters to avoid truncation.
-For the section marked 实际操作：, describe only what the current tool_name and arguments actually do. Multi-step requests in background and text/examples written by Write/Edit are not actions performed by this call (for example, if command only runs cat, say only that it reads a file).
-For the section marked 成功后的后果：, state the direct effect if this call succeeds; do not describe an operation that has not yet run as successful.
-For the section marked 命中规则：, give the identifier that actually applies under the review policy (default policy: allow A1–A6, deny D1–D6, ask ASK, default allow DEFAULT). Do not invent one.
+comment must use exactly this three-part structure, with all three parts non-empty: "Action: ...; Outcome: ...; Rule: ...". Write one concise sentence per part and keep the entire comment to no more than 120 characters to avoid truncation.
+For the section marked Action:, describe only what the current tool_name and arguments actually do. Multi-step requests in background and text/examples written by Write/Edit are not actions performed by this call (for example, if command only runs cat, say only that it reads a file).
+For the section marked Outcome:, state the direct effect if this call succeeds; do not describe an operation that has not yet run as successful.
+For the section marked Rule:, give the identifier that actually applies under the review policy (default policy: allow A1–A6, deny D1–D6, ask ASK, default allow DEFAULT). Do not invent one.
 `
 
 // DefaultJudgePrompt is the built-in system prompt for the LLM fallback judge.
@@ -121,10 +121,10 @@ ASK    delete a file whose ownership cannot be confirmed         Do not infer pr
 
 # Output Format
 The following are examples under the default review policy; the verdict must reflect the current call:
-Example: {"decision":"allow","comment":"实际操作：Create a verification report in this task directory；成功后的后果：Saves the report text; uploaded examples in the body are not executed automatically；命中规则：A2"}
-Example (current arguments only run cat report.md): {"decision":"allow","comment":"实际操作：Reads report.md；成功后的后果：Returns the existing report without creating or changing files；命中规则：A5"}
-Example: {"decision":"ask","comment":"实际操作：Delete one file of unknown ownership；成功后的后果：The file will be lost, and current context cannot establish whether it belongs to this test；命中规则：ASK (artifact ownership unclear)"}
-Example: {"decision":"deny","comment":"实际操作：Delete a real business order；成功后的后果：The business record will be lost；命中规则：D4"}
+Example: {"decision":"allow","comment":"Action: Create a verification report in this task directory; Outcome: Saves report text without executing examples; Rule: A2"}
+Example (current arguments only run cat report.md): {"decision":"allow","comment":"Action: Reads report.md; Outcome: Returns the file without changing it; Rule: A5"}
+Example: {"decision":"ask","comment":"Action: Delete a file of unknown ownership; Outcome: The file is lost, and its ownership is unclear; Rule: ASK"}
+Example: {"decision":"deny","comment":"Action: Delete a real business order; Outcome: The business record is lost; Rule: D4"}
 ` + JudgeOutputContract
 
 // Verdict is the parsed outcome of the judge's JSON reply.
@@ -190,14 +190,14 @@ func ParseVerdict(text string) Verdict {
 	if action != "allow" && action != "ask" && action != "deny" {
 		return Verdict{}
 	}
-	if len(reason) > 2400 || !strings.HasPrefix(reason, "实际操作：") {
+	if len(reason) > 2400 || !strings.HasPrefix(reason, "Action: ") {
 		return Verdict{}
 	}
-	operation, rest, ok := strings.Cut(strings.TrimPrefix(reason, "实际操作："), "；成功后的后果：")
+	operation, rest, ok := strings.Cut(strings.TrimPrefix(reason, "Action: "), "; Outcome: ")
 	if !ok || strings.TrimSpace(operation) == "" {
 		return Verdict{}
 	}
-	consequence, rule, ok := strings.Cut(rest, "；命中规则：")
+	consequence, rule, ok := strings.Cut(rest, "; Rule: ")
 	if !ok || strings.TrimSpace(consequence) == "" || strings.TrimSpace(rule) == "" {
 		return Verdict{}
 	}

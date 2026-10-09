@@ -677,7 +677,7 @@ func restoreInterceptRows(tx *sql.Tx, raw json.RawMessage) error {
 			source = "unknown"
 			if row["rule_id"] != nil {
 				source = "rule"
-			} else if reason, _ := row["reason"].(string); strings.HasPrefix(reason, "[模型]") {
+			} else if reason, _ := row["reason"].(string); strings.HasPrefix(reason, "[Model]") {
 				source = "model"
 			}
 			row["decision_source"] = source

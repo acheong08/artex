@@ -2436,7 +2436,7 @@ function route(m: string, path: string, seg: string[], q: URLSearchParams, b: Re
         row.decision_source ||
         (row.rule_id
           ? "rule"
-          : row.reason?.startsWith("[Model]") || row.reason?.startsWith("[模型]")
+          : row.reason?.startsWith("[Model]")
             ? "model"
             : "unknown");
       return (
