@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ARTEX 管理员密码重置脚本
+# ARTEX administrator password reset script
 #
-# 登录用户名固定为 ARTEX；密码以 bcrypt 哈希存放在数据库 settings 表的
-# auth.password_hash 键。本脚本连上数据库后，用 pgcrypto 在库内生成 bcrypt 哈希
-# 并写回该键——与后端登录校验（golang.org/x/crypto/bcrypt）完全兼容。
+# The login username is fixed as ARTEX. The password's bcrypt hash is stored under the
+# auth.password_hash key in the database settings table. After connecting to the database,
+# this script uses pgcrypto to generate a bcrypt hash in the database and write it to that key.
+# This is fully compatible with backend login verification (golang.org/x/crypto/bcrypt).
 #
-# 两种部署：
-#   local （默认）—— 宿主机直接用 psql 连数据库。连接信息按以下优先级获取：
-#                    命令行参数 > --dsn/$ARTEX_PG_DSN > config.json 的 database.*
-#   docker        —— 通过 `docker compose exec`（或 `docker exec`）在 postgres
-#                    容器内执行 psql（compose 默认不对宿主暴露 5432，故走容器内）。
+# Deployment modes:
+#   local (default) — Connect directly to the database from the host using psql. Connection
+#                     details are resolved in this order:
+#                     command-line arguments > --dsn/$ARTEX_PG_DSN > database.* in config.json
+#   docker         — Run psql inside the postgres container using `docker compose exec`
+#                    (or `docker exec`). Compose does not expose port 5432 to the host by default.
 #
-# 用法示例：
-#   ./reset-password.sh                          # 本地，自动读 config.json/环境，交互输入新密码
-#   ./reset-password.sh -p 'NewPass!'            # 本地，直接给定新密码
+# Usage examples:
+#   ./reset-password.sh                          # Local; read config.json/environment and prompt for a new password
+#   ./reset-password.sh -p 'NewPass!'            # Local; provide the new password directly
 #   ./reset-password.sh --dsn postgres://u:p@h:5432/artex
 #   ./reset-password.sh -H 127.0.0.1 -P 5433 -U autopentest -W pass -d artex
-#   ./reset-password.sh -m docker                # docker 部署（读 .env 的 POSTGRES_*）
-#   ./reset-password.sh -m docker -c pg容器名 --exec docker
+#   ./reset-password.sh -m docker                # Docker deployment (read POSTGRES_* from .env)
+#   ./reset-password.sh -m docker -c pg-container-name --exec docker
 #
-# 安全：新密码经环境变量 + psql \getenv 传入（不进入进程 argv），并用 :'var'
-# 自动转义（防 SQL 注入）；数据库密码经 PGPASSWORD 传递，同样不进 argv。
+# Security: The new password is passed through an environment variable and psql \getenv
+# (not included in the process argv) and automatically escaped using :'var' (to prevent SQL
+# injection). The database password is passed through PGPASSWORD and likewise omitted from argv.
 # =============================================================================
 set -euo pipefail
 
@@ -37,7 +40,7 @@ EXEC_KIND=""       # compose | docker（docker 模式下用哪种 exec；空=自
 NEWPASS=""
 ASSUME_YES=0
 
-die() { echo "错误：$*" >&2; exit 1; }
+die() { echo "Error: $*" >&2; exit 1; }
 info() { echo "· $*" >&2; }
 
 usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
@@ -59,12 +62,13 @@ while [[ $# -gt 0 ]]; do
     -p|--new-password) NEWPASS="${2:-}"; shift 2 ;;
     -y|--yes)         ASSUME_YES=1; shift ;;
     -h|--help)        usage ;;
-    *) die "未知参数：$1（-h 查看用法）" ;;
+    *) die "Unknown argument: $1 (use -h for usage)" ;;
   esac
 done
 
-# ---- 从 config.json 读取 database.*（仅 local 模式、且未显式给出连接时）-----
-# 优先用 python3 解析（健壮）；缺 python3 时退回 grep（config.json 为规整分字段）。
+# ---- Read database.* from config.json (local mode only, when no connection is specified) ----
+# Prefer parsing with python3; fall back to grep if python3 is unavailable (config.json uses
+# a regular, field-based format).
 read_config_json() {
   local path="$1"
   [[ -f "$path" ]] || return 1
@@ -75,7 +79,7 @@ try:
     d = json.load(open(sys.argv[1])).get("database", {})
 except Exception:
     sys.exit(1)
-# 支持直接给 dsn，或分字段
+# Accept either a DSN or individual fields.
 if d.get("dsn"):
     print("DSN\t" + d["dsn"]); sys.exit(0)
 for k in ("host","port","user","password","dbname","sslmode"):
@@ -83,7 +87,7 @@ for k in ("host","port","user","password","dbname","sslmode"):
         print(k.upper() + "\t" + str(d[k]))
 PY
   else
-    # 极简后备：逐键 grep（值为字符串或数字）
+    # Minimal fallback: grep each key (values must be strings or numbers).
     local k
     for k in host port user password dbname sslmode; do
       local v
@@ -110,7 +114,7 @@ apply_config_fields() {
   done
 }
 
-# ---- 自动判定模式 ---------------------------------------------------------
+# ---- Detect mode automatically --------------------------------------------
 if [[ -z "$MODE" ]]; then
   if [[ -n "$DSN$HOST$USER$DBNAME" || -n "${ARTEX_PG_DSN:-}" || -f "${CONFIG:-config.json}" ]]; then
     MODE="local"
@@ -120,22 +124,23 @@ if [[ -z "$MODE" ]]; then
     MODE="local"
   fi
 fi
-info "部署模式：$MODE"
+info "Deployment mode: $MODE"
 
 # ---- 采集新密码 -----------------------------------------------------------
 if [[ -z "$NEWPASS" ]]; then
-  read -r -s -p "输入新密码（用户名固定为 ARTEX）：" NEWPASS; echo >&2
-  [[ -n "$NEWPASS" ]] || die "密码不能为空"
-  read -r -s -p "再次输入以确认：" NEWPASS2; echo >&2
-  [[ "$NEWPASS" == "$NEWPASS2" ]] || die "两次输入不一致"
+  read -r -s -p "Enter the new password (username is fixed as ARTEX): " NEWPASS; echo >&2
+  [[ -n "$NEWPASS" ]] || die "Password cannot be empty"
+  read -r -s -p "Enter it again to confirm: " NEWPASS2; echo >&2
+  [[ "$NEWPASS" == "$NEWPASS2" ]] || die "The passwords do not match"
 fi
-[[ -n "$NEWPASS" ]] || die "密码不能为空"
+[[ -n "$NEWPASS" ]] || die "Password cannot be empty"
 
-# 通过环境变量把密码交给 psql（\getenv 读取，不进入 argv/ps）
+# Pass the password to psql through an environment variable (\getenv reads it; it is not in argv/ps).
 export ARTEX_RESET_NEWPASS="$NEWPASS"
 
-# 库内生成 bcrypt 并 upsert；密码用 :'newpw' 自动转义。CREATE EXTENSION 幂等，
-# 若数据库角色无建扩展权限会在此报错（提示见下方 run 的失败分支）。
+# Generate bcrypt and upsert it in the database; :'newpw' escapes the password automatically.
+# CREATE EXTENSION is idempotent. This fails if the database role cannot create extensions
+# (see the error handling below).
 SQL=$(cat <<SQL
 \\set ON_ERROR_STOP on
 \\getenv newpw ARTEX_RESET_NEWPASS
@@ -146,29 +151,29 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
 SQL
 )
 
-# ---- 执行 -----------------------------------------------------------------
+# ---- Execute ---------------------------------------------------------------
 if [[ "$MODE" == "local" ]]; then
-  # 连接信息优先级：命令行 > --dsn/$ARTEX_PG_DSN > config.json
+  # Connection priority: command line > --dsn/$ARTEX_PG_DSN > config.json
   if [[ -z "$DSN" && -z "$HOST$USER$DBNAME" ]]; then
     [[ -n "${ARTEX_PG_DSN:-}" ]] && DSN="$ARTEX_PG_DSN"
   fi
   if [[ -z "$DSN" && -z "$HOST$USER$DBNAME" ]]; then
     cfg="${CONFIG:-config.json}"
     if [[ -f "$cfg" ]]; then
-      info "从 $cfg 读取数据库配置"
+      info "Reading database configuration from $cfg"
       apply_config_fields < <(read_config_json "$cfg")
     fi
   fi
 
-  command -v psql >/dev/null 2>&1 || die "本机未找到 psql（请安装 postgresql-client，或改用 -m docker）"
+  command -v psql >/dev/null 2>&1 || die "psql not found on this host (install postgresql-client or use -m docker)"
 
   declare -a PSQL_ARGS=()
   if [[ -n "$DSN" ]]; then
     PSQL_ARGS=("$DSN")
     target="$DSN"
   else
-    [[ -n "$USER"   ]] || die "缺少数据库用户（-U）或有效的 config.json/DSN"
-    [[ -n "$DBNAME" ]] || die "缺少数据库名（-d）或有效的 config.json/DSN"
+    [[ -n "$USER"   ]] || die "Database username (-U) or a valid config.json/DSN is required"
+    [[ -n "$DBNAME" ]] || die "Database name (-d) or a valid config.json/DSN is required"
     HOST="${HOST:-127.0.0.1}"; PORT="${PORT:-5432}"; SSLMODE="${SSLMODE:-disable}"
     PSQL_ARGS=(-h "$HOST" -p "$PORT" -U "$USER" -d "$DBNAME")
     [[ -n "$SSLMODE" ]] && export PGSSLMODE="$SSLMODE"
@@ -176,22 +181,22 @@ if [[ "$MODE" == "local" ]]; then
     target="$USER@$HOST:$PORT/$DBNAME"
   fi
 
-  info "目标数据库：$target"
+  info "Target database: $target"
   if [[ "$ASSUME_YES" -ne 1 ]]; then
-    read -r -p "确认在该库重置 ARTEX 密码？[y/N] " ans
-    [[ "$ans" == "y" || "$ans" == "Y" ]] || die "已取消"
+    read -r -p "Reset the ARTEX password in this database? [y/N] " ans
+    [[ "$ans" == "y" || "$ans" == "Y" ]] || die "Cancelled"
   fi
 
   if ! printf '%s\n' "$SQL" | psql "${PSQL_ARGS[@]}" -v ON_ERROR_STOP=1 -q >/dev/null; then
-    die "写入失败。若报 pgcrypto 权限/缺失，请用具备建扩展权限的角色，或先手动执行 CREATE EXTENSION pgcrypto。"
+    die "Write failed. If pgcrypto is missing or permission is denied, use a role that can create extensions or run CREATE EXTENSION pgcrypto manually first."
   fi
 
 else
   # ---- docker ----
-  command -v docker >/dev/null 2>&1 || die "未找到 docker"
+  command -v docker >/dev/null 2>&1 || die "docker not found"
   CONTAINER="${CONTAINER:-postgres}"
 
-  # 选择 exec 方式：优先 docker compose exec（服务名），否则 docker exec（容器名）
+  # Select the exec method: prefer docker compose exec (service name), otherwise docker exec (container name).
   if [[ -z "$EXEC_KIND" ]]; then
     if docker compose version >/dev/null 2>&1 && [[ -f docker-compose.yml ]]; then
       EXEC_KIND="compose"
@@ -200,7 +205,8 @@ else
     fi
   fi
 
-  # 容器内的 psql 凭据：优先命令行，其次 .env 的 POSTGRES_*，再退回 compose 默认(artex)
+  # Credentials for psql in the container: prefer command-line values, then POSTGRES_* in .env,
+  # then fall back to the Compose defaults (artex).
   if [[ -f .env ]]; then
     # shellcheck disable=SC1091
     set -a; . ./.env; set +a
@@ -210,13 +216,14 @@ else
   [[ -n "$DBPASS" ]] && export PGPASSWORD="$DBPASS"
   [[ -z "${PGPASSWORD:-}" && -n "${POSTGRES_PASSWORD:-}" ]] && export PGPASSWORD="$POSTGRES_PASSWORD"
 
-  info "目标：容器 $CONTAINER 内 psql -U $DUSER -d $DNAME（exec=$EXEC_KIND）"
+  info "Target: psql -U $DUSER -d $DNAME in container $CONTAINER (exec=$EXEC_KIND)"
   if [[ "$ASSUME_YES" -ne 1 ]]; then
-    read -r -p "确认在该容器数据库重置 ARTEX 密码？[y/N] " ans
-    [[ "$ans" == "y" || "$ans" == "Y" ]] || die "已取消"
+    read -r -p "Reset the ARTEX password in this container database? [y/N] " ans
+    [[ "$ans" == "y" || "$ans" == "Y" ]] || die "Cancelled"
   fi
 
-  # -e 只带名字不带值 → 从当前环境继承，密码不出现在 docker 命令 argv 里。
+  # -e passes only variable names, inheriting their values from the current environment;
+  # passwords do not appear in the docker command argv.
   declare -a EXEC_CMD
   if [[ "$EXEC_KIND" == "compose" ]]; then
     EXEC_CMD=(docker compose exec -T -e ARTEX_RESET_NEWPASS -e PGPASSWORD "$CONTAINER"
@@ -227,9 +234,9 @@ else
   fi
 
   if ! printf '%s\n' "$SQL" | "${EXEC_CMD[@]}" >/dev/null; then
-    die "写入失败。请确认容器名（-c）、数据库账号（.env 的 POSTGRES_*），以及角色有 pgcrypto 权限。"
+    die "Write failed. Check the container name (-c), database credentials (POSTGRES_* in .env), and that the role can use pgcrypto."
   fi
 fi
 
 unset ARTEX_RESET_NEWPASS
-echo "✓ 已重置 ARTEX 管理员密码。请用用户名 ARTEX + 新密码登录（无需重启服务）。"
+echo "✓ ARTEX administrator password reset. Sign in with username ARTEX and the new password (no service restart required)."
