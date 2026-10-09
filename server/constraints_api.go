@@ -53,7 +53,7 @@ func (s *Server) addConstraint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除,无法新增约束")
+		writeErr(w, 409, "Task is being deleted; cannot add a constraint.")
 		return
 	}
 	defer s.engine.decInflight(t.ID)
@@ -68,12 +68,12 @@ func (s *Server) addConstraint(w http.ResponseWriter, r *http.Request) {
 	}
 	text := strings.TrimSpace(body.Text)
 	if text == "" {
-		writeErr(w, 400, "约束内容不能为空")
+		writeErr(w, 400, "Constraint text cannot be empty.")
 		return
 	}
 	kind := normalizeConstraintKind(body.Kind)
 	if kind == "" {
-		writeErr(w, 400, "kind 必须是 allow 或 deny")
+		writeErr(w, 400, "kind must be allow or deny")
 		return
 	}
 	id, err := t.Store.AddConstraint(kind, text, "human")
@@ -92,7 +92,7 @@ func (s *Server) editConstraint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除,无法修改约束")
+		writeErr(w, 409, "Task is being deleted; cannot update a constraint.")
 		return
 	}
 	defer s.engine.decInflight(t.ID)
@@ -112,12 +112,12 @@ func (s *Server) editConstraint(w http.ResponseWriter, r *http.Request) {
 	}
 	text := strings.TrimSpace(body.Text)
 	if text == "" {
-		writeErr(w, 400, "约束内容不能为空")
+		writeErr(w, 400, "Constraint text cannot be empty.")
 		return
 	}
 	kind := normalizeConstraintKind(body.Kind)
 	if kind == "" {
-		writeErr(w, 400, "kind 必须是 allow 或 deny")
+		writeErr(w, 400, "kind must be allow or deny")
 		return
 	}
 	if err := t.Store.UpdateConstraint(cid, kind, text); err != nil {
@@ -135,7 +135,7 @@ func (s *Server) deleteConstraint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除,无法删除约束")
+		writeErr(w, 409, "Task is being deleted; cannot delete a constraint.")
 		return
 	}
 	defer s.engine.decInflight(t.ID)

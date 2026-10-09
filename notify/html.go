@@ -43,7 +43,7 @@ func htmlBody(m Message, maxRunes int) string {
 		b.WriteString(htmlItem(m.Items[0], true))
 	}
 	if m.HomeURL != "" {
-		fmt.Fprintf(&b, `<p style="margin:16px 0 0;"><a href="%s" style="color:#1677ff;">在平台中查看全部</a></p>`, htmlEscapeAttr(m.HomeURL))
+		fmt.Fprintf(&b, `<p style="margin:16px 0 0;"><a href="%s" style="color:#1677ff;">View all in the platform</a></p>`, htmlEscapeAttr(m.HomeURL))
 	}
 	b.WriteString(`</div>`)
 	return TruncateHTML(b.String(), maxRunes)
@@ -53,9 +53,9 @@ func htmlBody(m Message, maxRunes int) string {
 func htmlBatchIntro(m Message) string {
 	var b strings.Builder
 	if m.WindowMinutes > 0 {
-		fmt.Fprintf(&b, `<h2 style="font-size:16px;margin:0 0 4px;">近 %d 分钟新增 %d 个漏洞</h2>`, m.WindowMinutes, len(m.Items))
+		fmt.Fprintf(&b, `<h2 style="font-size:16px;margin:0 0 4px;">%d new findings in the last %d minutes</h2>`, len(m.Items), m.WindowMinutes)
 	} else {
-		fmt.Fprintf(&b, `<h2 style="font-size:16px;margin:0 0 4px;">新增 %d 个漏洞</h2>`, len(m.Items))
+		fmt.Fprintf(&b, `<h2 style="font-size:16px;margin:0 0 4px;">%d new findings</h2>`, len(m.Items))
 	}
 	counts := map[string]int{}
 	for _, it := range m.Items {
@@ -103,20 +103,20 @@ func htmlItem(it Item, full bool) string {
 	}
 
 	if it.IsStatusChange() {
-		fmt.Fprintf(&b, `<div><b>状态变更</b>：%s → %s</div>`,
+		fmt.Fprintf(&b, `<div><b>Status change</b>: %s → %s</div>`,
 			htmlEscape(StatusLabel(it.FromStatus)), htmlEscape(StatusLabel(it.ToStatus)))
 	}
 	if it.VulnClass != "" && it.VulnClass != it.Title() {
-		fmt.Fprintf(&b, `<div><b>类型</b>：%s</div>`, htmlEscape(it.VulnClass))
+		fmt.Fprintf(&b, `<div><b>Type</b>: %s</div>`, htmlEscape(it.VulnClass))
 	}
 	if a := assetLine(it.Assets, maxAssetsShown); a != "" {
-		fmt.Fprintf(&b, `<div><b>资产</b>：%s</div>`, htmlEscape(a))
+		fmt.Fprintf(&b, `<div><b>Asset</b>: %s</div>`, htmlEscape(a))
 	}
 	if s := OneLine(it.Summary, maxSummaryRunes); s != "" {
-		fmt.Fprintf(&b, `<div><b>摘要</b>：%s</div>`, htmlEscape(s))
+		fmt.Fprintf(&b, `<div><b>Summary</b>: %s</div>`, htmlEscape(s))
 	}
 	if it.DetailURL != "" {
-		fmt.Fprintf(&b, `<div style="margin-top:6px;"><a href="%s" style="color:#1677ff;">查看详情</a></div>`, htmlEscapeAttr(it.DetailURL))
+		fmt.Fprintf(&b, `<div style="margin-top:6px;"><a href="%s" style="color:#1677ff;">View details</a></div>`, htmlEscapeAttr(it.DetailURL))
 	}
 	b.WriteString(`</div>`)
 	return b.String()

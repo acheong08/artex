@@ -66,7 +66,7 @@ func NewClient(proxy string) *http.Client {
 		Timeout:   30 * time.Minute, // 下载整包，不能按请求级超时卡死
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
-				return fmt.Errorf("重定向次数过多")
+				return fmt.Errorf("too many redirects")
 			}
 			return checkURL(req.URL)
 		},
@@ -76,10 +76,10 @@ func NewClient(proxy string) *http.Client {
 // checkURL 强制 https + 域名白名单。
 func checkURL(u *url.URL) error {
 	if u.Scheme != "https" {
-		return fmt.Errorf("拒绝非 HTTPS 地址: %s", u.Scheme+"://"+u.Host)
+		return fmt.Errorf("non-HTTPS URL is not allowed: %s", u.Scheme+"://"+u.Host)
 	}
 	if !allowedHosts[strings.ToLower(u.Hostname())] {
-		return fmt.Errorf("拒绝非 GitHub 域名: %s", u.Hostname())
+		return fmt.Errorf("non-GitHub host is not allowed: %s", u.Hostname())
 	}
 	return nil
 }
@@ -98,26 +98,26 @@ func FetchLatest(ctx context.Context, c *http.Client) (*Release, error) {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("访问 GitHub 失败（可在系统设置里配置全局代理）: %w", err)
+		return nil, fmt.Errorf("failed to reach GitHub (configure a global proxy in system settings if needed): %w", err)
 	}
 	defer resp.Body.Close()
 
 	switch {
 	case resp.StatusCode == http.StatusForbidden, resp.StatusCode == http.StatusTooManyRequests:
 		// 未认证的 GitHub API 是每 IP 每小时 60 次，共用出口 IP 时很容易撞上。
-		return nil, fmt.Errorf("GitHub 接口限流（每小时 60 次），请稍后再试")
+		return nil, fmt.Errorf("GitHub API rate limit reached (60 requests per hour); try again later")
 	case resp.StatusCode == http.StatusNotFound:
-		return nil, fmt.Errorf("仓库 %s 尚未发布任何正式版本", Repo)
+		return nil, fmt.Errorf("repository %s has not published a stable release yet", Repo)
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("GitHub 返回 %d", resp.StatusCode)
+		return nil, fmt.Errorf("GitHub returned %d", resp.StatusCode)
 	}
 
 	var rel Release
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, fmt.Errorf("解析 Release 失败: %w", err)
+		return nil, fmt.Errorf("failed to parse release: %w", err)
 	}
 	if strings.TrimSpace(rel.TagName) == "" {
-		return nil, fmt.Errorf("Release 缺少 tag")
+		return nil, fmt.Errorf("release is missing a tag")
 	}
 	return &rel, nil
 }

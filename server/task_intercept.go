@@ -24,7 +24,7 @@ func validateTaskInterceptRuleReq(req *taskInterceptRuleReq) error {
 		req.Action = "block"
 	}
 	if req.Action != "block" && req.Action != "allow" {
-		return fmt.Errorf("action 必须是 block 或 allow")
+		return fmt.Errorf("action must be block or allow")
 	}
 	v := assetInterceptRuleReq{Enabled: req.Enabled, Kind: req.Kind, Pattern: req.Pattern, Note: req.Note}
 	if err := validateAssetInterceptRuleReq(&v); err != nil {

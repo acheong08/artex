@@ -83,17 +83,17 @@ type webhookItem struct {
 func (webhookChannel) Validate(cfg map[string]any) error {
 	raw := cfgString(cfg, "url")
 	if raw == "" {
-		return errors.New("缺少目标 URL")
+		return errors.New("destination URL is required")
 	}
 	if err := validateHTTPURL(raw); err != nil {
-		return fmt.Errorf("目标 URL 无效: %w", err)
+		return fmt.Errorf("invalid destination URL: %w", err)
 	}
 	if m := strings.ToUpper(cfgString(cfg, "method")); m != "" && m != http.MethodGet && m != http.MethodPost && m != http.MethodPut && m != http.MethodPatch {
-		return fmt.Errorf("不支持的方法 %s（可用 GET/POST/PUT/PATCH）", m)
+		return fmt.Errorf("unsupported method %s (supported: GET/POST/PUT/PATCH)", m)
 	}
 	if tpl := cfgString(cfg, "body_template"); tpl != "" {
 		if _, err := parseWebhookTemplate(tpl); err != nil {
-			return fmt.Errorf("请求体模板语法错误: %w", err)
+			return fmt.Errorf("invalid request body template syntax: %w", err)
 		}
 	}
 	return nil
@@ -119,7 +119,7 @@ func (c webhookChannel) Send(ctx context.Context, cfg map[string]any, m Message)
 		// 模板渲染出的是字符串形式的 JSON，这里转成 json.RawMessage 原样发出，
 		// 避免二次转义把用户精心构造的结构套进一个 JSON 字符串里。
 		if !json.Valid([]byte(body)) {
-			return 0, Permanent(errors.New("请求体模板渲染结果不是合法 JSON"))
+			return 0, Permanent(errors.New("rendered request body template is not valid JSON"))
 		}
 		payload = json.RawMessage(body)
 	}
@@ -147,11 +147,11 @@ func renderWebhookBody(tpl string, m Message) (string, error) {
 	}
 	t, err := parseWebhookTemplate(tpl)
 	if err != nil {
-		return "", fmt.Errorf("请求体模板语法错误: %w", err)
+		return "", fmt.Errorf("invalid request body template syntax: %w", err)
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, newWebhookTemplateData(m)); err != nil {
-		return "", fmt.Errorf("渲染请求体模板失败: %w", err)
+		return "", fmt.Errorf("failed to render request body template: %w", err)
 	}
 	return buf.String(), nil
 }

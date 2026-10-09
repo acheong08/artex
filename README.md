@@ -5,7 +5,7 @@
 AI-powered autonomous penetration testing system (Go backend + Next.js frontend)
 
 
-🌐 **在线 Demo**： [https://artex-demo.vercel.app/](https://artex-demo.vercel.app/)
+🌐 **Live Demo**: [https://artex-demo.vercel.app/](https://artex-demo.vercel.app/)
 
 </div>
 
@@ -41,7 +41,7 @@ AI-powered autonomous penetration testing system (Go backend + Next.js frontend)
 
 | Interception approvals | Backend logs |
 | :---: | :---: |
-| ![拦截](screenshots/intercept.png) | ![日志](screenshots/logs.png) |
+| ![Interception](screenshots/intercept.png) | ![Logs](screenshots/logs.png) |
 
 
 ---
@@ -94,16 +94,16 @@ docker compose up -d          # Pull the autumn27/artex and postgres images
 The image includes common tools (ripgrep/curl/vim/npm/nmap…). `./skills` and `./data` are persisted using bind mounts.
 
 For remote MCP, select `http` (Streamable HTTP) or `sse` (legacy SSE) in system settings.
-Legacy SSE services usually establish an event stream with `GET /sse`, then receive JSON-RPC requests through the returned
-`/message?sessionId=...` 接收 JSON-RPC 请求；配置时将 URL 填为 `/sse`，请求头按
-`Authorization=Bearer <token>` 填写。
+Legacy SSE services usually establish an event stream with `GET /sse`, then receive JSON-RPC requests at the returned
+`/message?sessionId=...` endpoint. Configure the URL as `/sse` and set the request header as
+`Authorization=Bearer` (enter your token).
 
 ### Option 3: Download a Prebuilt Binary (Releases)
 
 Download the platform-specific zip from [Releases](https://github.com/Autumn-27/ARTEX/releases). Extract it to get `artex` + `start.sh` (`start.bat` on Windows) + `skills/` + `config.example.json`:
 
 ```bash
-cp config.example.json config.json   # 填好 database 连接
+cp config.example.json config.json   # Configure the database connection
 ./start.sh                           # → http://localhost:8787
 ```
 
@@ -176,7 +176,7 @@ cd ARTEX
 git pull                       # Update compose / scripts (optional)
 # Set ARTEX_TAG=v0.2.0 in .env to pin a version; defaults to latest
 docker compose pull artex
-docker compose up -d artex     # 换新镜像重启 → 自动迁移 schema
+docker compose up -d artex     # Restart with the new image → automatically migrate the schema
 docker image prune -f          # Remove old images (optional)
 ```
 
@@ -288,7 +288,7 @@ ARTEX is an **LLM-powered multi-agent autonomous penetration testing system**: a
 
 ```mermaid
 flowchart TB
-  subgraph FE["前端 Next.js（go:embed 内嵌单二进制）"]
+  subgraph FE["Frontend Next.js (embedded in the single binary with go:embed)"]
     UI["Dashboard · Tasks · Assets · Coverage Graph · Traffic · Workspace · System Settings"]
   end
   subgraph SRV["server（Go net/http）"]
@@ -306,7 +306,7 @@ flowchart TB
     AGRAPH["Asset Graph　assets / companies / task_scope"]
     EGRAPH["Exploration Graph　exploration_nodes / anchors / activity"]
   end
-  subgraph SUB["支撑子系统"]
+  subgraph SUB["Supporting subsystems"]
     PROXY["Traffic-recording proxy　MITM + CA audit trail"]
     GUARD["guard / intercept　tool approval gate"]
     ENR["enrich　asynchronous DNS / HTTP enrichment"]
@@ -456,7 +456,7 @@ Scan the QR code to follow the **SecSentry** WeChat Official Account, then send 
 
 <div align="center">
 
-<img src="screenshots/wx.png" alt="微信公众号 SecSentry" width="480" />
+<img src="screenshots/wx.png" alt="SecSentry WeChat Official Account" width="480" />
 
 </div>
 

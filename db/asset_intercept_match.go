@@ -15,28 +15,28 @@ import (
 func AssetInterceptKindLabel(kind string) string {
 	switch kind {
 	case "exact_domain":
-		return "域名(全等)"
+		return "Exact domain"
 	case "exact_ip":
-		return "IP(全等)"
+		return "Exact IP"
 	case "exact_url":
-		return "URL(全等)"
+		return "Exact URL"
 	case "fuzzy_domain":
-		return "域名(模糊)"
+		return "Fuzzy domain"
 	case "fuzzy_ip":
-		return "IP(模糊)"
+		return "Fuzzy IP"
 	case "fuzzy_url":
-		return "URL(模糊)"
+		return "Fuzzy URL"
 	case "cidr":
-		return "CIDR 网段"
+		return "CIDR range"
 	}
 	return kind
 }
 
 // Reason 返回一条可读的命中原因，形如：命中资产拦截规则 [域名(模糊): .gov.cn]（备注）。
 func (r AssetInterceptRule) Reason() string {
-	s := fmt.Sprintf("命中资产拦截规则 [%s: %s]", AssetInterceptKindLabel(r.Kind), r.Pattern)
+	s := fmt.Sprintf("Matched asset interception rule [%s: %s]", AssetInterceptKindLabel(r.Kind), r.Pattern)
 	if note := strings.TrimSpace(r.Note); note != "" {
-		s += "（" + note + "）"
+		s += " (" + note + ")"
 	}
 	return s
 }
@@ -188,7 +188,7 @@ func EvaluateAssetGate(blockRules, allowRules []AssetInterceptRule, domains, ips
 	}
 	if hasEnabledRule(allowRules) {
 		if _, _, ok := MatchAssetInterceptRules(allowRules, domains, ips, urls); !ok {
-			return AssetGateDecision{Allowed: false, Reason: "不在任务允许(白名单)范围内，不允许测试"}
+			return AssetGateDecision{Allowed: false, Reason: "Outside the task's allowed (allowlist) scope; testing is not permitted"}
 		}
 	}
 	return AssetGateDecision{Allowed: true}

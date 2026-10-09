@@ -72,10 +72,10 @@ func markdownText(s string, maxRunes int) string {
 // 出现了 `\(1\)` 这种可见的反斜杠。
 func markdownTitle(m Message) string {
 	if m.Batch {
-		return fmt.Sprintf("漏洞汇总 · 共 %d 条", len(m.Items))
+		return fmt.Sprintf("Finding summary · %d total", len(m.Items))
 	}
 	if len(m.Items) == 0 {
-		return "漏洞通知"
+		return "Finding notification"
 	}
 	it := m.Items[0]
 	return fmt.Sprintf("[%s] %s", SeverityLabel(it.Severity), OneLine(it.Title(), 0))
@@ -103,7 +103,7 @@ func markdownBody(m Message, maxBytes int) (string, int) {
 
 	footer := ""
 	if m.HomeURL != "" {
-		footer = fmt.Sprintf("\n[在平台中查看全部](%s)\n", m.HomeURL)
+		footer = fmt.Sprintf("\n[View all in the platform](%s)\n", m.HomeURL)
 	}
 	kept := packItemCount(m.Items, maxBytes, markdownReservedBytes, footer, byteSize, func(it Item, idx int) string {
 		var b strings.Builder
@@ -130,12 +130,12 @@ func markdownBody(m Message, maxBytes int) (string, int) {
 func markdownBatchIntro(m Message, items []Item, total int) string {
 	var b strings.Builder
 	if m.WindowMinutes > 0 {
-		fmt.Fprintf(&b, "**近 %d 分钟新增 %d 个漏洞**", m.WindowMinutes, total)
+		fmt.Fprintf(&b, "**%d new findings in the last %d minutes**", total, m.WindowMinutes)
 	} else {
-		fmt.Fprintf(&b, "**新增 %d 个漏洞**", total)
+		fmt.Fprintf(&b, "**%d new findings**", total)
 	}
 	if extra := total - len(items); extra > 0 {
-		fmt.Fprintf(&b, "（本条显示前 %d 条，其余 %d 条将在下一条消息继续）", len(items), extra)
+		fmt.Fprintf(&b, "(showing %d here; the remaining %d will be sent in the next message)", len(items), extra)
 	}
 	// 按级别给出分布，让读者一眼看到有没有严重项。只统计**本条实际包含**的
 	// 条目，保证「严重 3」和下面能数出来的条目一致。
@@ -183,21 +183,21 @@ func writeItem(b *strings.Builder, it Item, prefix string, single bool) {
 	}
 	b.WriteString(line + "\n")
 	if it.IsStatusChange() {
-		fmt.Fprintf(b, "**状态变更**：%s → %s\n",
+		fmt.Fprintf(b, "**Status change**: %s → %s\n",
 			markdownText(StatusLabel(it.FromStatus), 0), markdownText(StatusLabel(it.ToStatus), 0))
 	}
 	if it.VulnClass != "" && it.VulnClass != it.Title() {
-		fmt.Fprintf(b, "**类型**：%s\n", markdownText(it.VulnClass, 0))
+		fmt.Fprintf(b, "**Type**: %s\n", markdownText(it.VulnClass, 0))
 	}
 	if a := assetLine(it.Assets, maxAssetsShown); a != "" {
-		fmt.Fprintf(b, "**资产**：%s\n", markdownText(a, 0))
+		fmt.Fprintf(b, "**Asset**: %s\n", markdownText(a, 0))
 	}
 	if it.Summary != "" {
 		if s := markdownText(it.Summary, maxSummaryRunes); s != "" {
-			fmt.Fprintf(b, "**摘要**：%s\n", s)
+			fmt.Fprintf(b, "**Summary**: %s\n", s)
 		}
 	}
 	if it.DetailURL != "" {
-		fmt.Fprintf(b, "[查看详情](%s)\n", it.DetailURL)
+		fmt.Fprintf(b, "[View details](%s)\n", it.DetailURL)
 	}
 }

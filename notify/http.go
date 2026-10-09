@@ -73,10 +73,10 @@ func blockInternalDial(_, address string, _ syscall.RawConn) error {
 	}
 	ip := net.ParseIP(host)
 	if ip == nil {
-		return fmt.Errorf("无法解析目标地址 %q", host)
+		return fmt.Errorf("cannot resolve target address %q", host)
 	}
 	if isBlockedDialIP(ip) {
-		return fmt.Errorf("拒绝投递到本机/链路本地地址 %s（如确需投递到本机服务，设置 %s=1）", ip, AllowLocalTargetsEnv)
+		return fmt.Errorf("delivery to loopback/link-local address %s is blocked (to deliver to a local service, set %s=1)", ip, AllowLocalTargetsEnv)
 	}
 	return nil
 }
@@ -109,10 +109,10 @@ var httpClient = &http.Client{
 	Transport: notifyTransport,
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
-			return errors.New("重定向次数过多")
+			return errors.New("too many redirects")
 		}
 		if len(via) > 0 && req.URL.Host != via[0].URL.Host {
-			return fmt.Errorf("拒绝跨主机重定向（%s → %s）", via[0].URL.Host, req.URL.Host)
+			return fmt.Errorf("cross-host redirect blocked (%s → %s)", via[0].URL.Host, req.URL.Host)
 		}
 		return nil
 	},
@@ -135,7 +135,7 @@ func doJSON(ctx context.Context, method, url string, headers map[string]string, 
 		raw, err := json.Marshal(payload)
 		if err != nil {
 			// 序列化失败是本地 bug（配置字段类型不对），重试也不会变好。
-			return nil, Permanent(fmt.Errorf("构造请求体失败: %w", err))
+			return nil, Permanent(fmt.Errorf("failed to construct request body: %w", err))
 		}
 		body = bytes.NewReader(raw)
 	}
@@ -143,7 +143,7 @@ func doJSON(ctx context.Context, method, url string, headers map[string]string, 
 	if err != nil {
 		// URL 非法——多半是用户把地址填错了，属于永久失败。
 		// 这里同样不能透传 err：url.Parse 的错误文本里含完整地址。
-		return nil, Permanent(fmt.Errorf("请求地址非法: %s", redactRequestTarget(url)))
+		return nil, Permanent(fmt.Errorf("invalid request URL: %s", redactRequestTarget(url)))
 	}
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -161,24 +161,24 @@ func doJSON(ctx context.Context, method, url string, headers map[string]string, 
 		// 不脱敏的话，凭据会顺着这条错误串流到四个地方：notification_deliveries
 		// 的 last_error（明文落库）、投递历史接口的响应（**绕过渠道配置的掩码**）、
 		// 服务端日志、以及测试发送接口回给前端的 502 文本。
-		return nil, fmt.Errorf("请求失败: %s", redactTransportError(err))
+		return nil, fmt.Errorf("request failed: %s", redactTransportError(err))
 	}
 	defer resp.Body.Close()
 	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, respBodyLimit))
 	if readErr != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", readErr)
+		return nil, fmt.Errorf("failed to read response: %w", readErr)
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return raw, nil
 	}
 	// 429（限流）与 408（超时）值得重试；其余 4xx 是配置或权限问题，重试无意义。
 	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusRequestTimeout {
-		return nil, fmt.Errorf("对方限流或超时 (HTTP %d): %s", resp.StatusCode, snippet(raw))
+		return nil, fmt.Errorf("remote service rate-limited or timed out (HTTP %d): %s", resp.StatusCode, snippet(raw))
 	}
 	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("对方服务异常 (HTTP %d): %s", resp.StatusCode, snippet(raw))
+		return nil, fmt.Errorf("remote service error (HTTP %d): %s", resp.StatusCode, snippet(raw))
 	}
-	return nil, Permanent(fmt.Errorf("对方拒绝请求 (HTTP %d): %s", resp.StatusCode, snippet(raw)))
+	return nil, Permanent(fmt.Errorf("remote service rejected the request (HTTP %d): %s", resp.StatusCode, snippet(raw)))
 }
 
 // snippet 把响应体压成一行短文本，用于错误信息。响应里可能带换行与大量空白，
@@ -205,7 +205,7 @@ func snippet(raw []byte) string {
 func redactRequestTarget(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
-		return "(地址不可解析)"
+		return "(address could not be parsed)"
 	}
 	return u.Scheme + "://" + u.Host + "/…"
 }
@@ -225,7 +225,7 @@ func redactTransportError(err error) string {
 		if uerr.Err != nil {
 			return fmt.Sprintf("%s %s: %s", uerr.Op, host, uerr.Err)
 		}
-		return fmt.Sprintf("%s %s: 未知错误", uerr.Op, host)
+		return fmt.Sprintf("%s %s: unknown error", uerr.Op, host)
 	}
 	// 非 *url.Error（如重定向策略返回的错误）也可能带地址，统一走脱敏。
 	return redactURLsInText(err.Error())

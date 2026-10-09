@@ -25,7 +25,7 @@ import (
 //     不可漏推。
 
 // ErrNotificationChannelNotFound 渠道不存在。
-var ErrNotificationChannelNotFound = errors.New("通知渠道不存在")
+var ErrNotificationChannelNotFound = errors.New("notification channel not found")
 
 // 投递状态。
 const (
@@ -138,7 +138,7 @@ func (d *DB) SaveNotificationChannel(ctx context.Context, c *NotificationChannel
 	// 「未指定」与「显式 0」的区别只有调用方知道（请求体里字段缺省 vs 明确传 0），
 	// 所以默认值由 server 层在字段缺省时填，见 notifyCreateChannel。
 	if c.RatePerMin < 0 {
-		return 0, errors.New("限流值不能为负")
+		return 0, errors.New("rate limit cannot be negative")
 	}
 	if c.Config == nil {
 		c.Config = json.RawMessage(`{}`)
@@ -184,7 +184,7 @@ func (d *DB) SetNotificationChannelEnabled(ctx context.Context, id int64, enable
 		if !enabled {
 			if _, err := tx.ExecContext(ctx, `UPDATE notification_deliveries SET state=$2, last_error=$3
 WHERE channel_id=$1 AND state IN ($4,$5)`,
-				id, NotifyStateSkipped, "渠道已停用", NotifyStatePending, NotifyStateSending); err != nil {
+				id, NotifyStateSkipped, "Channel disabled", NotifyStatePending, NotifyStateSending); err != nil {
 				return err
 			}
 		}
@@ -225,19 +225,19 @@ func (d *DB) DeleteNotificationChannel(ctx context.Context, id int64) error {
 func RecordNotificationEventTx(ctx context.Context, tx *sql.Tx, kind string, findingID int64, snap notify.Snapshot) bool {
 	raw, err := json.Marshal(snap)
 	if err != nil {
-		log.Printf("[notify] 序列化推送事件失败 finding=%d: %v", findingID, err)
+		log.Printf("[notify] failed to serialize notification event finding=%d: %v", findingID, err)
 		return false
 	}
 	if _, err := tx.ExecContext(ctx, `SAVEPOINT notify_event`); err != nil {
-		log.Printf("[notify] 建立保存点失败 finding=%d: %v", findingID, err)
+		log.Printf("[notify] failed to create savepoint finding=%d: %v", findingID, err)
 		return false
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO notification_events(kind,finding_id,snapshot) VALUES($1,$2,$3)`,
 		kind, findingID, string(raw)); err != nil {
-		log.Printf("[notify] 写入推送事件失败 finding=%d（漏洞记录不受影响）: %v", findingID, err)
+		log.Printf("[notify] failed to write notification event finding=%d (finding record is unaffected): %v", findingID, err)
 		// 回滚到保存点，把事务从 aborted 状态里救回来。
 		if _, rbErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT notify_event`); rbErr != nil {
-			log.Printf("[notify] 回滚到保存点失败 finding=%d: %v", findingID, rbErr)
+			log.Printf("[notify] failed to roll back to savepoint finding=%d: %v", findingID, rbErr)
 		}
 		return false
 	}
@@ -251,7 +251,7 @@ func RecordNotificationEventTx(ctx context.Context, tx *sql.Tx, kind string, fin
 func (d *DB) AddNotificationEvent(ctx context.Context, kind string, findingID int64, snap notify.Snapshot) (int64, error) {
 	raw, err := json.Marshal(snap)
 	if err != nil {
-		return 0, fmt.Errorf("序列化通知事件快照失败: %w", err)
+		return 0, fmt.Errorf("failed to serialize notification event snapshot: %w", err)
 	}
 	var id int64
 	err = d.QueryRowContext(ctx, `INSERT INTO notification_events(kind,finding_id,snapshot) VALUES($1,$2,$3) RETURNING id`,
