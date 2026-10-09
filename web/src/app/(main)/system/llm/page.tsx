@@ -574,7 +574,7 @@ function ProfileSheet({
             />
             <p className="text-muted-foreground text-xs">
               Only outbound LLM requests use this proxy. Supports http/https/socks5 and optional credentials (for example,
-              socks5://user:pass@host:port，密码含特殊字符需 URL 编码）；留空表示不使用代理（直连）。
+              ******host:port; URL-encode special characters in the password. Leave blank to connect directly without a proxy.
             </p>
           </div>
 

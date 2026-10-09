@@ -75,7 +75,7 @@ export const CHANNEL_FIELDS: Record<string, FieldDef[]> = {
         { value: "GET", label: "GET (no body)" },
       ],
     },
-    { key: "headers", label: "自定义请求头", kind: "kv", help: "每行 KEY=VALUE，例如 Authorization=Bearer xxx" },
+    { key: "headers", label: "Custom request headers", kind: "kv", help: "One KEY=VALUE pair per line, e.g. Authorization=******" },
     {
       key: "body_template",
       label: "Request body template",

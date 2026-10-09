@@ -311,7 +311,7 @@ export default function MCPPage() {
         <div className="grid gap-2">
           <Label htmlFor="m-env">
             {form.transport !== "stdio"
-              ? "请求头（每行 KEY=VALUE，如 Authorization=Bearer xxx）"
+              ? "Request headers (one KEY=VALUE pair per line, e.g. Authorization=******"
               : "Environment variables (one KEY=VALUE pair per line)"}
           </Label>
           <Textarea

@@ -156,7 +156,7 @@ function appendUploads(desc: string, atts: ChatAttachment[]): string {
     return `${desc.replace(/\s*$/, "")}\n${bullets}\n`;
   }
   const head = desc.trim() ? `${desc.replace(/\s*$/, "")}\n\n` : "";
-  return `${head}${UPLOAD_MARKER} worker 可用 Read/Bash 按路径打开：\n${bullets}\n`;
+  return `${head}${UPLOAD_MARKER} The worker can open these files by path using Read/Bash:\n${bullets}\n`;
 }
 
 // POLL_MS is the task-list refresh interval. Task state moves on the server (planner /
@@ -950,7 +950,7 @@ export default function TasksPage() {
                       onSort={sortTasksBy}
                     />
                     <TableHead className="text-center">Goal progress</TableHead>
-                    <TableHead className="text-center" title="严重 / 高 / 中 / 低">
+                    <TableHead className="text-center" title="Critical / High / Medium / Low">
                       Findings <span className="text-muted-foreground font-normal">C/H/M/L</span>
                     </TableHead>
                     <TableHead className="text-center">Active workers</TableHead>
@@ -1227,7 +1227,7 @@ const TaskRow = React.memo(function TaskRow({
             <span className={n > 0 ? cls : "text-muted-foreground"}>{n}</span>
           );
           return (
-            <span className="font-medium whitespace-nowrap" title="严重 / 高 / 中 / 低">
+            <span className="font-medium whitespace-nowrap" title="Critical / High / Medium / Low">
               {seg(f.critical, "text-rose-600 dark:text-rose-400")}
               <span className="text-muted-foreground">/</span>
               {seg(f.high, "text-red-600 dark:text-red-400")}
@@ -1521,7 +1521,7 @@ function ArchiveConfirmDialog({
 function TaskArchiveAction({ task, onArchive }: { task: Task; onArchive: (task: Task) => Promise<void> }) {
   const reason = archiveBlockReason(task);
   const trigger = (
-    <Button size="icon" variant="ghost" disabled={Boolean(reason)} aria-label={`归档任务 #${task.id}`}>
+    <Button size="icon" variant="ghost" disabled={Boolean(reason)} aria-label={`Archive task #${task.id}`}>
       <ArchiveIcon />
     </Button>
   );
@@ -1571,6 +1571,19 @@ function ArchiveStateBadge({ state }: { state: TaskArchiveState }) {
   if (ARCHIVE_PROCESSING_STATES.has(state)) variant = "default";
   if (ARCHIVE_FAILED_STATES.has(state)) variant = "destructive";
   return <Badge variant={variant}>{archiveStateLabel(state)}</Badge>;
+}
+
+function archivePhaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    等待归档: "Waiting to archive",
+    压缩任务数据: "Compressing task data",
+    归档完成: "Archive complete",
+    等待还原: "Waiting to restore",
+    恢复任务数据: "Restoring task data",
+    等待永久删除: "Waiting for permanent deletion",
+    删除归档包: "Deleting archive",
+  };
+  return labels[phase] ?? phase;
 }
 
 function formatArchiveBytes(bytes: number): string {
@@ -1677,7 +1690,7 @@ function TaskArchivesPanel({ onChanged }: { onChanged: () => void }) {
         let restored = false;
         states.forEach((state, index) => {
           if (state.status !== "rejected" || !(state.reason instanceof Error)) return;
-          if (!state.reason.message.includes("归档不存在")) return;
+          if (!state.reason.message.includes("归档不存在") && !state.reason.message.includes("Archive not found")) return;
           pendingRestoreIDs.current.delete(pending[index]);
           restored = true;
         });
@@ -1949,7 +1962,7 @@ function TaskArchivesPanel({ onChanged }: { onChanged: () => void }) {
                           </p>
                         ))}
                         <span className="text-muted-foreground text-xs">
-                          {archive.phase} · {archive.progress}%
+                          {archivePhaseLabel(archive.phase)} · {archive.progress}%
                         </span>
                       </div>
                     </TableCell>

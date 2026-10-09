@@ -329,13 +329,13 @@ export function MentionTextarea({ value, onValueChange, onKeyDown, className, in
         <div className="flex flex-wrap items-center gap-1 px-1 pt-1">
           {selected.map((item) => (
             <Badge key={item.start} variant="secondary" className="max-w-full gap-1">
-              <span className="max-w-64 truncate" title={item.label}>
-                {item.label}
+              <span className="max-w-64 truncate" title={item.displayLabel}>
+                {item.displayLabel}
               </span>
               <button
                 type="button"
                 disabled={disabled}
-                aria-label={`Remove mention ${item.label}`}
+                aria-label={`Remove mention ${item.displayLabel}`}
                 onClick={() => {
                   onValueChange(value.slice(0, item.start) + value.slice(item.start + item.token.length));
                   setCursor(null);

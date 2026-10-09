@@ -13,8 +13,8 @@ export const CHAT_SEND_MODE_KEY = "artex_chat_send_mode";
 export const DEFAULT_CHAT_SEND_MODE: ChatSendMode = "enter";
 
 export const CHAT_SEND_MODE_OPTIONS: { value: ChatSendMode; label: string }[] = [
-  { value: "enter", label: "Enter 发送，Shift+Enter 换行" },
-  { value: "ctrl-enter", label: "Ctrl+Enter 发送，Enter 换行" },
+  { value: "enter", label: "Enter to send, Shift+Enter for a new line" },
+  { value: "ctrl-enter", label: "Ctrl+Enter to send, Enter for a new line" },
 ];
 
 function parseMode(raw: string | null): ChatSendMode {

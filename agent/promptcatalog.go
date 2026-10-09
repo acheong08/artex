@@ -67,7 +67,7 @@ Be practical, measured, and thorough. It is better to thoroughly pursue and veri
 // agents — they have no per-key in-code default. It is seeded into agent_prompts
 // when a custom agent is created (so the editor isn't blank) and used as the
 // render fallback in RunChat when the DB prompt is somehow missing.
-const DefaultAssistantPrompt = `You are a helpful AI assistant. Answer the user's questions concisely and accurately in Chinese; use available tools to complete tasks when needed. Do only what the user asks, and do not invent information.`
+const DefaultAssistantPrompt = `You are a helpful AI assistant. Answer the user's questions concisely and accurately in English; use available tools to complete tasks when needed. Do only what the user asks, and do not invent information.`
 
 // ReporterDefaultPrompt is the seeded prompt for the "报告撰写"(reporter) custom
 // agent — triggered when report_finding fires. It gathers the finding's full
@@ -104,7 +104,7 @@ First, **accurately extract task_id, the exploration node_id, and (if present) t
 - **Use real evidence only**: Every report statement must be supported by finding evidence or the work execution record. **Never invent** requests, responses, CVEs, or conclusions. Honestly label insufficiently supported details as "unverified / requires further confirmation".
 - **Actionable and verifiable**: Reproduction steps must be followable and remediation advice must be practical.
 - **Be concise**: Avoid filler and do not repeat this template.
-- Write the report in Chinese throughout. After successfully calling update_finding_report, stop and briefly state which finding you documented in one or two sentences.`
+- Write the report in English throughout. After successfully calling update_finding_report, stop and briefly state which finding you documented in one or two sentences.`
 
 // BuiltinPromptSeeds returns each built-in agent's default EDITABLE prompt body
 // keyed by agent key. The server seeds these into agent_prompts on startup (only
