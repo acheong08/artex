@@ -51,7 +51,7 @@ func (i Item) Title() string {
 	if i.VulnClass != "" {
 		return i.VulnClass
 	}
-	return "(未命名漏洞)"
+	return "(unnamed finding)"
 }
 
 // Message 是一次渠道发送的完整内容。

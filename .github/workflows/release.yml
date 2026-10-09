@@ -4,10 +4,10 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write # 创建 Release 需要
+  contents: write # Required to create a release.
 
 jobs:
-  # ① 前端静态导出（一次），产物给交叉编译各平台复用
+  # 1) Export the frontend once and reuse the artifacts for cross-platform builds.
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -26,7 +26,7 @@ jobs:
           name: web-dist
           path: web/out
 
-  # ② 五平台交叉编译（内嵌前端）+ 打 zip
+  # 2) Cross-compile for five platforms (with the frontend embedded) and create zip archives.
   binaries:
     needs: frontend
     runs-on: ubuntu-latest
@@ -55,8 +55,9 @@ jobs:
           ARTEX_BUILD_VERSION: ${{ github.ref_name }}
           ARTEX_SKIP_FRONTEND: "1"
           ARTEX_SKIP_NPM_CI: "1"
-          # UPX 自解压 ELF 在部分 Linux 内核、虚拟化和安全策略下会崩溃。
-          # Release 使用 Go linker 裁剪和 zip 压缩，优先保证可移植性。
+          # UPX-packed ELF binaries may crash under some Linux kernels, virtualization
+          # environments, and security policies. Releases use Go linker trimming and zip
+          # compression to prioritize portability.
           ARTEX_COMPRESS: "0"
           ARTEX_PACKAGE: "1"
           ARTEX_PACKAGE_DIR: dist
@@ -69,14 +70,14 @@ jobs:
         with:
           name: pkg-${{ matrix.goos }}-${{ matrix.goarch }}
           path: "dist/*.zip"
-      # Linux 生二进制单独上传，供 docker job 复用（免在镜像里重编前端+Go）
+      # Upload Linux binaries separately for reuse by the Docker job (avoids rebuilding the frontend and Go binary in the image).
       - if: matrix.goos == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: bin-linux-${{ matrix.goarch }}
           path: dist/artex-linux-${{ matrix.goarch }}/artex
 
-  # ③ 汇总所有 zip → 创建 GitHub Release
+  # 3) Gather all zip archives and create a GitHub release.
   release:
     needs: binaries
     runs-on: ubuntu-latest
@@ -96,8 +97,9 @@ jobs:
             dist/SHA256SUMS
           generate_release_notes: true
 
-  # ④ 多架构镜像 → 推 Docker Hub（复用 binaries 编好的 Linux 二进制，
-  #    镜像里只装工具 + 放二进制；arm64 仅需模拟 apt 层，构建快很多）
+  # 4) Publish a multi-architecture image to Docker Hub using the Linux binaries built above.
+  #    The image only installs tools and copies the binaries; arm64 only needs to emulate the
+  #    apt layer, making the build much faster.
   docker:
     needs: binaries
     runs-on: ubuntu-latest

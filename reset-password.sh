@@ -31,12 +31,12 @@ set -euo pipefail
 PASS_KEY="auth.password_hash"
 BCRYPT_COST=10
 
-MODE=""            # local | docker（空=自动判定）
+MODE=""            # local | docker (empty = auto-detect)
 DSN=""
 HOST="" PORT="" USER="" DBPASS="" DBNAME="" SSLMODE=""
 CONFIG=""
-CONTAINER=""       # docker 模式的 postgres 服务/容器名（默认 postgres）
-EXEC_KIND=""       # compose | docker（docker 模式下用哪种 exec；空=自动）
+CONTAINER=""       # postgres service/container name in Docker mode (default: postgres)
+EXEC_KIND=""       # compose | docker (exec method in Docker mode; empty = auto-detect)
 NEWPASS=""
 ASSUME_YES=0
 
@@ -45,7 +45,7 @@ info() { echo "· $*" >&2; }
 
 usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
-# ---- 参数解析 -------------------------------------------------------------
+# ---- Parse arguments --------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--mode)        MODE="${2:-}"; shift 2 ;;
@@ -126,7 +126,7 @@ if [[ -z "$MODE" ]]; then
 fi
 info "Deployment mode: $MODE"
 
-# ---- 采集新密码 -----------------------------------------------------------
+# ---- Get new password -------------------------------------------------------
 if [[ -z "$NEWPASS" ]]; then
   read -r -s -p "Enter the new password (username is fixed as ARTEX): " NEWPASS; echo >&2
   [[ -n "$NEWPASS" ]] || die "Password cannot be empty"

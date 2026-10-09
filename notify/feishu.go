@@ -34,10 +34,10 @@ func (feishuChannel) DestinationKeys() []string { return []string{"webhook"} }
 func (feishuChannel) Validate(cfg map[string]any) error {
 	hook := cfgString(cfg, "webhook")
 	if hook == "" {
-		return errors.New("缺少 Webhook 地址")
+		return errors.New("Webhook URL is required")
 	}
 	if err := validateHTTPURL(hook); err != nil {
-		return fmt.Errorf("Webhook 地址无效: %w", err)
+		return fmt.Errorf("invalid Webhook URL: %w", err)
 	}
 	return nil
 }
@@ -69,13 +69,13 @@ func (c feishuChannel) Send(ctx context.Context, cfg map[string]any, m Message) 
 		StatusMessage string `json:"StatusMessage"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
-		return 0, fmt.Errorf("解析飞书响应失败: %w (%s)", err, snippet(raw))
+		return 0, fmt.Errorf("failed to parse Feishu response: %w (%s)", err, snippet(raw))
 	}
 	if res.Code != 0 {
-		return 0, Permanent(fmt.Errorf("飞书返回错误 %d: %s", res.Code, res.Msg))
+		return 0, Permanent(fmt.Errorf("Feishu returned error %d: %s", res.Code, res.Msg))
 	}
 	if res.StatusCode != 0 {
-		return 0, Permanent(fmt.Errorf("飞书返回错误 %d: %s", res.StatusCode, res.StatusMessage))
+		return 0, Permanent(fmt.Errorf("Feishu returned error %d: %s", res.StatusCode, res.StatusMessage))
 	}
 	return kept, nil
 }
@@ -133,14 +133,14 @@ func feishuCard(m Message) (map[string]any, int) {
 			elements = append(elements, feishuMarkdownDiv(feishuBatchLine(it, i+1)))
 		}
 		if m.HomeURL != "" {
-			elements = append(elements, feishuButton("在平台中查看全部", m.HomeURL))
+			elements = append(elements, feishuButton("View all in the platform", m.HomeURL))
 		}
 	} else if len(m.Items) > 0 {
 		kept = 1
 		it := m.Items[0]
 		elements = append(elements, feishuMarkdownDiv(feishuItemLines(it)))
 		if it.DetailURL != "" {
-			elements = append(elements, feishuButton("查看详情", it.DetailURL))
+			elements = append(elements, feishuButton("View details", it.DetailURL))
 		}
 	}
 
@@ -179,18 +179,18 @@ func feishuButton(label, url string) map[string]any {
 func feishuItemLines(it Item) string {
 	out := fmt.Sprintf("**%s · %s**", SeverityLabel(it.Severity), markdownText(it.Title(), 0))
 	if it.IsStatusChange() {
-		out += fmt.Sprintf("\n**状态变更**：%s → %s",
+		out += fmt.Sprintf("\n**Status change**: %s → %s",
 			markdownText(StatusLabel(it.FromStatus), 0), markdownText(StatusLabel(it.ToStatus), 0))
 	}
 	if it.VulnClass != "" && it.VulnClass != it.Title() {
-		out += fmt.Sprintf("\n**类型**：%s", markdownText(it.VulnClass, 0))
+		out += fmt.Sprintf("\n**Type**: %s", markdownText(it.VulnClass, 0))
 	}
 	if a := assetLine(it.Assets, maxAssetsShown); a != "" {
-		out += fmt.Sprintf("\n**资产**：%s", markdownText(a, 0))
+		out += fmt.Sprintf("\n**Asset**: %s", markdownText(a, 0))
 	}
 	if it.Summary != "" {
 		if s := markdownText(it.Summary, maxSummaryRunes); s != "" {
-			out += fmt.Sprintf("\n**摘要**：%s", s)
+			out += fmt.Sprintf("\n**Summary**: %s", s)
 		}
 	}
 	return out

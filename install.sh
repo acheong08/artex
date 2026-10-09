@@ -74,7 +74,7 @@ install_local(){
       DB_SSL="$(ask 'sslmode (disable/require)' disable)" ;;
   esac
 
-  # 生成 config.json
+  # Generate config.json.
   cat > config.json <<JSON
 {
   "database": {
@@ -89,11 +89,11 @@ install_local(){
 JSON
   ok "Generated config.json"
 
-  # go 环境检查
+  # Check for Go.
   command -v go >/dev/null 2>&1 || die "Go not found. Install Go (>=1.26): https://go.dev/dl/"
   ok "Go: $(go version)"
 
-  # 内嵌前端需要 node 出静态产物
+  # Node.js is required to generate the static assets for the embedded frontend.
   if command -v npm >/dev/null 2>&1; then
     info "Building frontend static assets…"
     ( cd web && npm ci && npm run build:static )

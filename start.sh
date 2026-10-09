@@ -31,9 +31,9 @@ stopping=0
 
 # Forward shutdown signals to artex.
 #
-# Docker 下这是必需的：docker stop 只把 SIGTERM 发给 PID 1（也就是本脚本），
-# 不会发给子进程。不转发的话 artex 收不到信号、做不了优雅关闭，10 秒后被 SIGKILL
-# 硬杀，正在跑的任务直接断在半路。
+# This is required in Docker: docker stop sends SIGTERM only to PID 1 (this script), not its
+# child process. Without forwarding the signal, artex cannot shut down gracefully and is
+# forcibly killed with SIGKILL after 10 seconds, interrupting any running tasks.
 forward() {
 	stopping=1
 	if [ "$child" -ne 0 ]; then
@@ -47,8 +47,8 @@ while :; do
 	"$BIN" "$@" &
 	child=$!
 
-	# 信号会打断 wait 并让它返回 >128。此时子进程其实还在做优雅关闭，
-	# 必须再 wait 一次才能拿到它真正的退出码。
+	# A signal interrupts wait and makes it return >128, while the child is still shutting down
+	# gracefully. Wait again to get the child's actual exit code.
 	wait "$child"
 	code=$?
 	if [ "$code" -gt 128 ]; then

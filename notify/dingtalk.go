@@ -38,10 +38,10 @@ func (dingTalkChannel) DestinationKeys() []string { return []string{"webhook"} }
 func (dingTalkChannel) Validate(cfg map[string]any) error {
 	hook := cfgString(cfg, "webhook")
 	if hook == "" {
-		return errors.New("缺少 Webhook 地址")
+		return errors.New("Webhook URL is required")
 	}
 	if err := validateHTTPURL(hook); err != nil {
-		return fmt.Errorf("Webhook 地址无效: %w", err)
+		return fmt.Errorf("invalid Webhook URL: %w", err)
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func (c dingTalkChannel) Send(ctx context.Context, cfg map[string]any, m Message
 				"title":          title,
 				"text":           text,
 				"btnOrientation": "0",
-				"singleTitle":    "查看详情",
+				"singleTitle":    "View details",
 				"singleURL":      m.Items[0].DetailURL,
 			},
 		}
@@ -90,12 +90,12 @@ func (c dingTalkChannel) Send(ctx context.Context, cfg map[string]any, m Message
 		ErrMsg  string `json:"errmsg"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
-		return 0, fmt.Errorf("解析钉钉响应失败: %w (%s)", err, snippet(raw))
+		return 0, fmt.Errorf("failed to parse DingTalk response: %w (%s)", err, snippet(raw))
 	}
 	if res.ErrCode != 0 {
 		// 301000 是签名校验失败、310000 是关键词不匹配——都是配置错误，
 		// 重试不会自愈。
-		return 0, Permanent(fmt.Errorf("钉钉返回错误 %d: %s", res.ErrCode, res.ErrMsg))
+		return 0, Permanent(fmt.Errorf("DingTalk returned error %d: %s", res.ErrCode, res.ErrMsg))
 	}
 	return kept, nil
 }
@@ -117,7 +117,7 @@ func dingTalkSignedURL(hook, secret string, now time.Time) (string, error) {
 	u, err := url.Parse(hook)
 	if err != nil {
 		// 不透传 err：url.Parse 的错误文本里带完整地址（含 access_token）。
-		return "", fmt.Errorf("解析 Webhook 地址失败: %s", redactRequestTarget(hook))
+		return "", fmt.Errorf("failed to parse Webhook URL: %s", redactRequestTarget(hook))
 	}
 	q := u.Query()
 	q.Set("timestamp", ts)
@@ -145,16 +145,16 @@ func dingTalkSignedURL(hook, secret string, now time.Time) (string, error) {
 func validateHTTPURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("地址无法解析（%s）", redactRequestTarget(raw))
+		return fmt.Errorf("could not parse address (%s)", redactRequestTarget(raw))
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("只支持 http/https，收到 %q", u.Scheme)
+		return fmt.Errorf("only http/https are supported; received %q", u.Scheme)
 	}
 	if u.Host == "" {
-		return errors.New("缺少主机名")
+		return errors.New("hostname is required")
 	}
 	if ip := net.ParseIP(u.Hostname()); ip != nil && isBlockedDialIP(ip) && !allowLocalTargets() {
-		return fmt.Errorf("拒绝投递到本机/链路本地地址 %s（如确需投递到本机服务，设置 %s=1）", ip, AllowLocalTargetsEnv)
+		return fmt.Errorf("delivery to loopback/link-local address %s is blocked (to deliver to a local service, set %s=1)", ip, AllowLocalTargetsEnv)
 	}
 	return nil
 }
